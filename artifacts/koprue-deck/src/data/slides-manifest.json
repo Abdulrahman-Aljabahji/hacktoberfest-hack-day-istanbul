@@ -1,0 +1,74 @@
+[
+  {
+    "id": "824cd45a-586e-48cd-98db-76bb727a917a",
+    "position": 1,
+    "filepath": "src/pages/slides/Cover.tsx",
+    "title": "KÖPRÜ",
+    "description": "KÖPRÜ",
+    "speakerNotes": ""
+  },
+  {
+    "id": "cb7468f6-256b-425c-8120-2b1a0a30d21d",
+    "position": 2,
+    "filepath": "src/pages/slides/NotUnderstanding.tsx",
+    "title": "Translation is not understanding",
+    "description": "Translation is not understanding",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9f941d59-41bb-4931-9356-1860915e0b0c",
+    "position": 3,
+    "filepath": "src/pages/slides/Meet.tsx",
+    "title": "Meet KÖPRÜ",
+    "description": "Meet KÖPRÜ",
+    "speakerNotes": ""
+  },
+  {
+    "id": "0843f89e-3581-492b-bf98-1688fbbe5a70",
+    "position": 4,
+    "filepath": "src/pages/slides/NoticeToAction.tsx",
+    "title": "From notice to action",
+    "description": "From notice to action",
+    "speakerNotes": ""
+  },
+  {
+    "id": "83300e9b-7b7e-4120-942e-010758a83fa5",
+    "position": 5,
+    "filepath": "src/pages/slides/Gemma.tsx",
+    "title": "Built on Gemma 4",
+    "description": "Built on Gemma 4",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a3c5f3cd-057d-4fa0-bfa8-52654e635cdf",
+    "position": 6,
+    "filepath": "src/pages/slides/Honest.tsx",
+    "title": "Honest by design",
+    "description": "Honest by design",
+    "speakerNotes": ""
+  },
+  {
+    "id": "3c58c01f-48c7-4e2e-b161-7a0da5a5873f",
+    "position": 7,
+    "filepath": "src/pages/slides/Felt.tsx",
+    "title": "Designed to be felt",
+    "description": "Designed to be felt",
+    "speakerNotes": ""
+  },
+  {
+    "id": "1ce9b0ec-9598-4fa1-b77d-8deeadb6ddfa",
+    "position": 8,
+    "filepath": "src/pages/slides/Responsible.tsx",
+    "title": "Responsible and open",
+    "description": "Responsible and open",
+    "speakerNotes": ""
+  },
+  {
+    "id": "522af136-6a65-42ca-a00a-7fe2fbbede72",
+    "position": 9,
+    "filepath": "src/pages/slides/Close.tsx",
+    "title": "Cross the gap",
+    "description": "Cross the gap",
+    "speakerNotes": ""
+  }
+]

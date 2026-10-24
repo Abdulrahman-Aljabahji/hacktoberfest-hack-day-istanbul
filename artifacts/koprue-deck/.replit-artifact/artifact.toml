@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/koprue-deck/"
+title = "KÖPRÜ Pitch Deck"
+description = "A 9-slide hackathon pitch deck for KÖPRÜ, an AI app that turns photos of confusing notices into multilingual action plans with Gemma 4, aimed at Hacktoberfest Hack Day Istanbul judges."
+version = "1.0.0"
+id = "artifacts/koprue-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/koprue-deck/" ]
+localPort = 18728
+
+[services.development]
+run = "pnpm --filter @workspace/koprue-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/koprue-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/koprue-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18728"
+BASE_PATH = "/koprue-deck/"
