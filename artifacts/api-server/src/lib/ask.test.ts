@@ -32,6 +32,12 @@ test("image answers are ai-extracted, never verified", async () => {
   assert.equal(r.evidence[0]?.evidence, "ai-extracted");
 });
 
+test("answers from a photo transcript: found quote is ai-extracted, invented quote is unverified, never verified", async () => {
+  stub(() => reply({ found: true, answer: "Free.", quotes: ["Etkinlik ücretsizdir.", "Katılım 50 liradır."] }));
+  const r = await askNotice({ lang: "en", question: "Free?", text: TEXT, fromPhoto: true });
+  assert.deepEqual(r.evidence.map((e) => e.evidence), ["ai-extracted", "unverified"]);
+});
+
 test("not found: no quotes are carried even if the model sent some", () => {
   const p = parseAskAnswer(JSON.stringify({ found: false, answer: "The notice does not say.", quotes: ["Etkinlik ücretsizdir."] }));
   assert.equal(p.found, false);

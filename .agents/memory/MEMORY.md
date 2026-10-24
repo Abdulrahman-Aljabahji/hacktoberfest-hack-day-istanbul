@@ -1,1 +1,2 @@
 - [KÖPRÜ trust/action rules](koprue-design-decisions.md) — evidence, calendar and Ask invariants
+- [KÖPRÜ photo pipeline](koprue-design-decisions.md) — thinking-token latency, two-stage OCR, hedged calls

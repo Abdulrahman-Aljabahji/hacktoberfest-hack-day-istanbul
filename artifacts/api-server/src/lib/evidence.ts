@@ -25,9 +25,9 @@ export function normalizeForMatch(input: string): string {
 
 /**
  * Decide how much a model-proposed quote can be trusted.
- * - "verified" only when the normalized quote is found inside the normalized source text.
- * - "ai-extracted" when the input was an image and no text check was possible.
- * - "unverified" when we had text to check against and the quote is not in it.
+ * - Text input: "verified" only when the normalized quote is found inside the normalized source text.
+ * - Photo input: `sourceText` is the AI's own transcript of the photo. A quote found in it is only
+ *   "ai-extracted" (the transcript itself could be wrong); a quote missing from it is "unverified".
  * - "none" when the model gave no quote.
  */
 export function checkQuote(
@@ -38,9 +38,9 @@ export function checkQuote(
   const q = normalizeForMatch(quote ?? "");
   if (!q) return "none";
   const src = normalizeForMatch(sourceText ?? "");
-  if (src && q.length >= MIN_QUOTE_LENGTH && src.includes(q)) return "verified";
-  if (hasImage) return "ai-extracted";
-  return "unverified";
+  const found = Boolean(src) && q.length >= MIN_QUOTE_LENGTH && src.includes(q);
+  if (hasImage) return !src || found ? "ai-extracted" : "unverified";
+  return found ? "verified" : "unverified";
 }
 
 /** Map Arabic-Indic and Persian digits to ASCII so "٢٨" matches 28. */

@@ -134,6 +134,8 @@ export const InterpretResultMode = {
 
 export interface InterpretResult {
   plan: ActionPlan;
+  /** Text the AI read from a photo (empty for pasted text) */
+  transcript: string;
   mode: InterpretResultMode;
 }
 
@@ -152,6 +154,8 @@ export interface AskInput {
   question: string;
   text?: string;
   image?: string;
+  /** True when text is the AI transcript of a photo */
+  fromPhoto?: boolean;
 }
 
 export interface AskQuote {
@@ -179,6 +183,7 @@ export const ErrorCode = {
   timeout: 'timeout',
   upstream_unavailable: 'upstream_unavailable',
   bad_model_response: 'bad_model_response',
+  no_text_found: 'no_text_found',
   server_error: 'server_error',
 } as const;
 

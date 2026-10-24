@@ -13,4 +13,6 @@ export interface AskInput {
   question: string;
   text?: string;
   image?: string;
+  /** True when text is the AI transcript of a photo */
+  fromPhoto?: boolean;
 }

@@ -267,10 +267,13 @@ components:
         caution: { type: string }
     InterpretResult:
       type: object
-      required: [plan, mode]
+      required: [plan, transcript, mode]
       properties:
         plan:
           $ref: "#/components/schemas/ActionPlan"
+        transcript:
+          type: string
+          description: Text the AI read from a photo (empty for pasted text)
         mode:
           type: string
           enum: [live]
@@ -284,6 +287,9 @@ components:
         question: { type: string, maxLength: 300 }
         text: { type: string }
         image: { type: string }
+        fromPhoto:
+          type: boolean
+          description: True when text is the AI transcript of a photo
     AskQuote:
       type: object
       required: [quote, evidence]
@@ -313,6 +319,7 @@ components:
         - timeout
         - upstream_unavailable
         - bad_model_response
+        - no_text_found
         - server_error
     ErrorResponse:
       type: object

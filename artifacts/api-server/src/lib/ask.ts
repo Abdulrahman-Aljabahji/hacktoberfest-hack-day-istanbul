@@ -1,5 +1,5 @@
 import { checkQuote, type EvidenceStatus } from "./evidence";
-import { HttpError, callModel, isConfigured, readSource } from "./interpret";
+import { HttpError, isConfigured, readSource, resilientCall } from "./interpret";
 
 const LANG_NAMES: Record<string, string> = { en: "English", tr: "Turkish", ar: "Arabic" };
 const MAX_QUOTES = 3;
@@ -64,6 +64,8 @@ export async function askNotice(input: {
   question: string;
   text?: string | null;
   image?: string | null;
+  /** True when `text` is the AI's transcript of a photo rather than text the reader pasted. */
+  fromPhoto?: boolean;
 }): Promise<AskResult> {
   if (!isConfigured()) {
     throw new HttpError(503, "Live analysis is not configured.", "not_configured");
@@ -77,12 +79,12 @@ export async function askNotice(input: {
     },
   ];
   if (image) parts.push({ inline_data: { mime_type: image.mime, data: image.data } });
-  const output = await callModel(parts, Boolean(image), 900);
+  const output = await resilientCall(parts, Boolean(image), 900, { totalMs: 30000 });
   let parsed: ParsedAnswer;
   try {
     parsed = parseAskAnswer(output);
   } catch {
     throw new HttpError(502, "The model response could not be understood.", "bad_model_response");
   }
-  return annotateAnswer(parsed, { sourceText: sourceText || null, hasImage: Boolean(image) });
+  return annotateAnswer(parsed, { sourceText: sourceText || null, hasImage: Boolean(image) || Boolean(input.fromPhoto) });
 }

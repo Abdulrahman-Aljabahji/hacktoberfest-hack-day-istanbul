@@ -23,6 +23,12 @@ const MAX = 25 * 1024 * 1024;
 
 // The wait is real model time, so this is a calm animation plus honest text. It is not a progress bar.
 function Loading() {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const id = window.setInterval(() => setSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, []);
   return (
     <div className="space-y-5" role="status" aria-live="polite" data-testid="state-loading">
       <div className="border-2 border-secondary bg-card p-5 shadow-[8px_8px_0_hsl(var(--accent))]">
@@ -33,7 +39,8 @@ function Loading() {
           ))}
         </svg>
         <p className="mono mt-3 font-bold">Gemma 4 is reading your notice</p>
-        <p className="mt-1 text-sm text-muted-foreground">This usually takes 5 to 10 seconds. Your original stays on the left, and the plan appears here when the model answers.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Photos usually take 15 to 30 seconds: Gemma 4 reads the text first, then builds your plan. Your original stays on the left.</p>
+        {secs >= 20 && <p className="mt-2 text-sm font-bold" data-testid="text-slow-hint">Still working ({secs}s). This photo is taking longer than usual, and a second attempt starts automatically if needed. If it fails, your image stays here to retry.</p>}
       </div>
       <div className="skeleton h-24" aria-hidden="true" />
       <div className="skeleton h-24" aria-hidden="true" />
@@ -47,6 +54,8 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>('en');
   const [src, setSrc] = useState<Source>({ kind: 'sample' });
   const [live, setLive] = useState<ActionPlan | null>(null);
+  // What the AI read from a photo. Shown to the reader and reused for Ask (smaller, faster than resending the image).
+  const [transcript, setTranscript] = useState('');
   const [state, setState] = useState<Status>('ready');
   const [failure, setFailure] = useState<Failure | null>(null);
   // docId changes whenever a different document is analyzed. Checklist and Q&A reset with it. Nothing is persisted.
@@ -94,6 +103,7 @@ export default function Home() {
       );
       if (id !== reqId.current) return;
       setLive(res.plan);
+      setTranscript(res.transcript ?? '');
       setState('ready');
     } catch (err) {
       if (id !== reqId.current || c.signal.aborted) return;
@@ -115,6 +125,7 @@ export default function Home() {
     setDone(new Set());
     setSrc({ kind: 'sample' });
     setLive(null);
+    setTranscript('');
     setFailure(null);
     setState('ready');
   };
@@ -162,7 +173,7 @@ export default function Home() {
   const rtl = lang === 'ar';
   const a = A[lang];
   const toggleDone = (i: number) => setDone((d) => { const n = new Set(d); if (n.has(i)) n.delete(i); else n.add(i); return n; });
-  const askSource = src.kind === 'image' ? { image: src.value } : { text: src.kind === 'text' ? src.value : [SAMPLE_NOTICE.title, ...SAMPLE_NOTICE.lines].join('\n') };
+  const askSource = src.kind === 'image' ? (transcript ? { text: transcript, fromPhoto: true } : { image: src.value }) : { text: src.kind === 'text' ? src.value : [SAMPLE_NOTICE.title, ...SAMPLE_NOTICE.lines].join('\n') };
 
   const speak = () => {
     if (!plan || !('speechSynthesis' in window)) return flash('Speech is unavailable in this browser.');
@@ -301,6 +312,13 @@ export default function Home() {
               )}
               {src.kind === 'image' && <img src={src.value} alt="Your uploaded notice" className="mt-3 max-h-80 w-full object-contain" />}
               {src.kind === 'text' && <p dir="auto" className="mt-3 text-sm whitespace-pre-wrap break-words max-h-80 overflow-auto">{src.value}</p>}
+              {src.kind === 'image' && transcript && state === 'ready' && (
+                <details className="mt-3 text-sm" data-testid="details-transcript">
+                  <summary className="mono cursor-pointer">Text Gemma 4 read from your photo</summary>
+                  <p dir="auto" className="mt-2 whitespace-pre-wrap break-words max-h-48 overflow-auto" data-testid="text-transcript">{transcript}</p>
+                  <p className="mt-2 text-xs text-secondary/70">AI transcription. It can contain reading mistakes, so compare it with your image.</p>
+                </details>
+              )}
               <p className="text-xs mt-4 text-secondary/70">
                 {src.kind === 'sample' ? 'Invented for demonstration. Not a real event announcement.' : 'Processed only for this request and sent to the Gemini API. Avoid private documents.'}
               </p>

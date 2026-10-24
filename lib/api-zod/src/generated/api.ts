@@ -74,6 +74,7 @@ export const InterpretNoticeResponse = zod.object({
 }),
   "caution": zod.string()
 }),
+  "transcript": zod.string().describe('Text the AI read from a photo (empty for pasted text)'),
   "mode": zod.enum(['live'])
 })
 
@@ -89,7 +90,8 @@ export const AskNoticeBody = zod.object({
   "lang": zod.enum(['en', 'tr', 'ar']),
   "question": zod.string().max(askNoticeBodyQuestionMax),
   "text": zod.string().optional(),
-  "image": zod.string().optional()
+  "image": zod.string().optional(),
+  "fromPhoto": zod.boolean().optional().describe('True when text is the AI transcript of a photo')
 })
 
 export const AskNoticeResponse = zod.object({

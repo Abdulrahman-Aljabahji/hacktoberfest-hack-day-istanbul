@@ -11,6 +11,8 @@ import type { Lang } from '@/lib/sample';
 export interface AskSource {
   text?: string;
   image?: string;
+  /** True when `text` is the AI's transcript of a photo. */
+  fromPhoto?: boolean;
 }
 
 /**
@@ -39,7 +41,7 @@ export function AskNotice({ lang, source, available }: { lang: Lang; source: Ask
     setBusy(true);
     setFailure(null);
     try {
-      const res = await askNotice({ lang: l, question: text, ...(source.image ? { image: source.image } : { text: source.text ?? '' }) }, { signal: c.signal });
+      const res = await askNotice({ lang: l, question: text, ...(source.image ? { image: source.image } : { text: source.text ?? '', ...(source.fromPhoto ? { fromPhoto: true } : {}) }) }, { signal: c.signal });
       if (id !== reqId.current) return;
       setAnswer(res);
     } catch (err) {
@@ -49,7 +51,7 @@ export function AskNotice({ lang, source, available }: { lang: Lang; source: Ask
     } finally {
       if (id === reqId.current) setBusy(false);
     }
-  }, [source.image, source.text]);
+  }, [source.image, source.text, source.fromPhoto]);
 
   // If the reader switches language, answer the same question again in the new language.
   useEffect(() => {

@@ -10,5 +10,7 @@ import type { InterpretResultMode } from './interpretResultMode';
 
 export interface InterpretResult {
   plan: ActionPlan;
+  /** Text the AI read from a photo (empty for pasted text) */
+  transcript: string;
   mode: InterpretResultMode;
 }

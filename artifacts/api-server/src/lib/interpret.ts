@@ -1,4 +1,5 @@
-import { checkQuote, quoteHasNumber, type EvidenceStatus } from "./evidence";
+import { asciiDigits, checkQuote, quoteHasNumber, type EvidenceStatus } from "./evidence";
+import { logger } from "./logger";
 const LANG_NAMES: Record<string, string> = {
   en: "English",
   tr: "Turkish",
@@ -52,9 +53,12 @@ const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export function validateEvent(raw: Record<string, string>): ParsedEvent | null {
   const m = DATE_RE.exec(raw["date"] ?? "");
   if (!m) return null;
-  const year = m[1] ? Number(m[1]) : null;
   const month = Number(m[2]);
   const day = Number(m[3]);
+  // The model sometimes drops a year the quote states. Recover it only when the quote names exactly one.
+  const quotedYears = new Set((asciiDigits(raw["source"] ?? "").match(/\b20\d{2}\b/g) ?? []));
+  const yearStr = m[1] ?? (quotedYears.size === 1 ? [...quotedYears][0]! : undefined);
+  const year = yearStr ? Number(yearStr) : null;
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   // Reject impossible calendar dates such as 02-30 (2024 is a leap year, so 02-29 stays allowed).
   const probe = new Date(Date.UTC(year ?? 2024, month - 1, day));
@@ -72,7 +76,7 @@ export function validateEvent(raw: Record<string, string>): ParsedEvent | null {
   return {
     title: raw["title"] ?? "",
     kind: raw["kind"] === "deadline" ? "deadline" : "event",
-    date: m[1] ? `${m[1]}-${m[2]}-${m[3]}` : `${m[2]}-${m[3]}`,
+    date: yearStr ? `${yearStr}-${m[2]}-${m[3]}` : `${m[2]}-${m[3]}`,
     time,
     endTime,
     location: raw["location"] ?? "",
@@ -208,6 +212,7 @@ export type ErrorCode =
   | "timeout"
   | "upstream_unavailable"
   | "bad_model_response"
+  | "no_text_found"
   | "server_error";
 
 export class HttpError extends Error {
@@ -249,7 +254,9 @@ export async function callModel(
   parts: Record<string, unknown>[],
   hasImage: boolean,
   maxOutputTokens: number,
+  signal: AbortSignal = AbortSignal.timeout(45000),
 ): Promise<string> {
+  const started = Date.now();
   let response: Response;
   try {
     response = await fetch(
@@ -268,7 +275,7 @@ export async function callModel(
             thinkingConfig: { thinkingLevel: "minimal" },
           },
         }),
-        signal: AbortSignal.timeout(45000),
+        signal,
       },
     );
   } catch (err) {
@@ -279,7 +286,20 @@ export async function callModel(
   }
   const json = (await response.json().catch(() => ({}))) as {
     candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
   };
+  // Timing and token counts only: never the prompt, the image, the answer or credentials.
+  logger.info(
+    {
+      ms: Date.now() - started,
+      status: response.status,
+      hasImage,
+      promptTokens: json.usageMetadata?.promptTokenCount,
+      outputTokens: json.usageMetadata?.candidatesTokenCount,
+      thoughtTokens: json.usageMetadata?.thoughtsTokenCount ?? 0,
+    },
+    "model call",
+  );
   if (!response.ok) throw upstreamError(response.status, hasImage);
   const output =
     json.candidates?.[0]?.content?.parts
@@ -290,6 +310,57 @@ export async function callModel(
     throw new HttpError(502, "The model returned no response.", "bad_model_response");
   }
   return output;
+}
+
+const RETRYABLE = new Set<ErrorCode>(["timeout", "upstream_unavailable", "bad_model_response"]);
+
+/**
+ * Photos make the model's reasoning time vary a lot (measured: 14 s for one call, 52-64 s for
+ * an identical one). So a slow call is hedged: a second identical call starts after `hedgeMs`
+ * (or at once after a transient failure) and the first success wins. Permanent errors
+ * (bad image, bad key, quota) are never retried.
+ */
+export function resilientCall(
+  parts: Record<string, unknown>[],
+  hasImage: boolean,
+  maxOutputTokens: number,
+  opts: { attemptMs?: number; hedgeMs?: number; totalMs?: number; maxAttempts?: number } = {},
+): Promise<string> {
+  const { attemptMs = 30000, hedgeMs = 14000, totalMs = 36000, maxAttempts = 2 } = opts;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let launched = 0;
+    let failed = 0;
+    let lastErr: HttpError | null = null;
+    const ctl = new AbortController();
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      timers.forEach(clearTimeout);
+      ctl.abort();
+      fn();
+    };
+    const launch = () => {
+      if (settled || launched >= maxAttempts) return;
+      launched++;
+      callModel(parts, hasImage, maxOutputTokens, AbortSignal.any([ctl.signal, AbortSignal.timeout(attemptMs)])).then(
+        (text) => finish(() => resolve(text)),
+        (e) => {
+          if (settled) return;
+          const err = e instanceof HttpError ? e : new HttpError(502, "The AI service is unreachable right now.", "upstream_unavailable");
+          lastErr = err;
+          failed++;
+          if (!RETRYABLE.has(err.code)) return finish(() => reject(err));
+          if (launched < maxAttempts) return launch();
+          if (failed >= launched) finish(() => reject(err));
+        },
+      );
+    };
+    timers.push(setTimeout(launch, hedgeMs));
+    timers.push(setTimeout(() => finish(() => reject(lastErr ?? new HttpError(504, "The model timed out.", "timeout"))), totalMs));
+    launch();
+  });
 }
 
 export interface Source {
@@ -310,26 +381,56 @@ export function readSource(input: { text?: string | null; image?: string | null 
   return { sourceText, image: match ? { mime: match[1]!, data: match[2]! } : null };
 }
 
+const OCR_PROMPT =
+  "Transcribe all text visible in this image exactly as written, line by line, in its original language. Output the plain text only. No commentary, no translation, no markdown. If there is no readable text, output nothing.";
+
+const MIN_TRANSCRIPT = 12;
+
+/** Stage 1 for photos: a small, fast transcription call. */
+export async function transcribeImage(image: { mime: string; data: string }): Promise<string> {
+  const out = await resilientCall(
+    [{ text: OCR_PROMPT }, { inline_data: { mime_type: image.mime, data: image.data } }],
+    true,
+    1500,
+    { totalMs: 34000 },
+  );
+  return out.replace(/^\s*```\w*\s*/, "").replace(/\s*```\s*$/, "").trim().slice(0, 6000);
+}
+
+export interface InterpretOutput {
+  plan: ActionPlan;
+  /** What the AI read from a photo (empty for pasted text). Shown so the reader can check it. */
+  transcript: string;
+}
+
 export async function interpret(input: {
   lang: string;
   text?: string | null;
   image?: string | null;
-}): Promise<ActionPlan> {
+}): Promise<InterpretOutput> {
   if (!isConfigured()) {
     throw new HttpError(503, "Live analysis is not configured. The interactive sample works without it.", "not_configured");
   }
   const { sourceText, image } = readSource(input);
+  let transcript = "";
+  if (image) {
+    transcript = await transcribeImage(image);
+    if (transcript.length < MIN_TRANSCRIPT && !sourceText) {
+      throw new HttpError(422, "No readable text was found in this image.", "no_text_found");
+    }
+  }
+  // Stage 2 always works on text, which keeps the heavy structured answer fast and predictable.
+  const material = [sourceText, transcript].filter(Boolean).join("\n");
   const parts: Record<string, unknown>[] = [
-    { text: `${makePrompt(input.lang)}\n\nUser-supplied text:\n${sourceText || "(See attached image)"}` },
+    { text: `${makePrompt(input.lang)}\n\nUser-supplied text:\n${material}` },
   ];
-  if (image) parts.push({ inline_data: { mime_type: image.mime, data: image.data } });
-
-  const output = await callModel(parts, Boolean(image), 3000);
+  const output = await resilientCall(parts, false, 2600, { totalMs: 38000 });
   let parsed: ParsedPlan;
   try {
     parsed = parseAnswer(output);
   } catch {
     throw new HttpError(502, "The model response could not be understood.", "bad_model_response");
   }
-  return annotatePlan(parsed, { sourceText: sourceText || null, hasImage: Boolean(image) });
+  const plan = annotatePlan(parsed, { sourceText: material, hasImage: Boolean(image) });
+  return { plan, transcript };
 }

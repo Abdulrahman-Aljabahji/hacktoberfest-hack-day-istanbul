@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { HttpError, annotatePlan, interpret, parseAnswer, upstreamError } from "./interpret";
+import { HttpError, annotatePlan, interpret, parseAnswer, resilientCall, upstreamError } from "./interpret";
 
 const TEXT = "Kayıt için 27 Ekim saat 17.00'ye kadar formu doldurunuz. Salon B zemin kat.";
 
@@ -35,16 +35,83 @@ async function failureOf(p: Promise<unknown>): Promise<HttpError> {
 
 test("text input: evidence is verified, unverified or none per item", async () => {
   stubFetch(() => modelReply(goodModelJson));
-  const plan = await interpret({ lang: "en", text: TEXT });
+  const { plan, transcript } = await interpret({ lang: "en", text: TEXT });
+  assert.equal(transcript, "");
   assert.deepEqual(plan.steps.map((s) => s.evidence), ["verified", "unverified", "none"]);
   assert.equal(plan.facts[0]?.evidence, "verified");
 });
 
-test("image input: quotes are labelled ai-extracted, never verified", async () => {
-  stubFetch(() => modelReply(goodModelJson));
-  const plan = await interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" });
-  assert.deepEqual(plan.steps.map((s) => s.evidence), ["ai-extracted", "ai-extracted", "none"]);
+const PHOTO_TRANSCRIPT = "Kayıt için 27 Ekim saat 17.00'ye kadar formu doldurunuz.\nSalon B zemin kat";
+
+/** Stage 1 (transcription) gets the transcript; stage 2 (analysis) gets the plan JSON. */
+function twoStage(transcript: string, plan = goodModelJson) {
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+    const body = String(init?.body);
+    bodies.push(body);
+    return modelReply(body.includes("Transcribe all text") ? transcript : plan);
+  }) as typeof fetch;
+  return bodies;
+}
+
+test("photo input: the image goes to the transcription call only, and quotes are never marked verified", async () => {
+  const bodies = twoStage(PHOTO_TRANSCRIPT);
+  const { plan, transcript } = await interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" });
+  assert.equal(transcript, PHOTO_TRANSCRIPT);
+  assert.equal(bodies.length, 2);
+  assert.ok(bodies[0]!.includes("inline_data"));
+  assert.ok(!bodies[1]!.includes("inline_data"), "analysis call must be text only");
+  assert.ok(bodies[1]!.includes("Salon B zemin kat"), "analysis must use the transcript");
+  // found in the transcript -> ai-extracted; invented quote -> unverified; no quote -> none
+  assert.deepEqual(plan.steps.map((s) => s.evidence), ["ai-extracted", "unverified", "none"]);
   assert.equal(plan.facts[0]?.evidence, "ai-extracted");
+  assert.ok([...plan.steps, ...plan.facts].every((i) => i.evidence !== "verified"));
+});
+
+test("photo with no readable text fails clearly instead of inventing a plan", async () => {
+  twoStage("   ");
+  assert.equal((await failureOf(interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" }))).code, "no_text_found");
+});
+
+test("a slow first attempt is hedged and the faster second attempt wins", async () => {
+  let calls = 0;
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+    calls++;
+    if (calls === 1) {
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    }
+    return modelReply("ok");
+  }) as typeof fetch;
+  const t0 = Date.now();
+  const out = await resilientCall([{ text: "x" }], false, 100, { hedgeMs: 50, totalMs: 5000, attemptMs: 4000 });
+  assert.equal(out, "ok");
+  assert.equal(calls, 2);
+  assert.ok(Date.now() - t0 < 2000);
+});
+
+test("a transient 500 is retried once and then succeeds", async () => {
+  let calls = 0;
+  globalThis.fetch = (async () => (++calls === 1 ? new Response("{}", { status: 500 }) : modelReply("fine"))) as typeof fetch;
+  assert.equal(await resilientCall([{ text: "x" }], false, 100, { hedgeMs: 5000 }), "fine");
+  assert.equal(calls, 2);
+});
+
+test("quota and bad-key errors are not retried", async () => {
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response("{}", { status: 429 }); }) as typeof fetch;
+  await assert.rejects(resilientCall([{ text: "x" }], false, 100), (e: HttpError) => e.code === "quota_exceeded");
+  assert.equal(calls, 1);
+});
+
+test("when every attempt hangs, the call ends with timeout at the total deadline", async () => {
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) => new Promise<Response>((_, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+  })) as typeof fetch;
+  const t0 = Date.now();
+  await assert.rejects(resilientCall([{ text: "x" }], false, 100, { hedgeMs: 30, totalMs: 200, attemptMs: 5000 }), (e: HttpError) => e.code === "timeout");
+  assert.ok(Date.now() - t0 < 1500);
 });
 
 test("annotatePlan tags every item", () => {

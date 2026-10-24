@@ -19,5 +19,6 @@ export const ErrorCode = {
   timeout: 'timeout',
   upstream_unavailable: 'upstream_unavailable',
   bad_model_response: 'bad_model_response',
+  no_text_found: 'no_text_found',
   server_error: 'server_error',
 } as const;

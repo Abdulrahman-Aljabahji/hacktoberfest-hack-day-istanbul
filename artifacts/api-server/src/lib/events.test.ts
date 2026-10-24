@@ -65,3 +65,10 @@ test("plans without the new fields still parse with empty lists", () => {
   const plan = parseAnswer(JSON.stringify({ headline: "h", steps: [], facts: [] }));
   assert.deepEqual([plan.events, plan.requirements, plan.missing], [[], [], []]);
 });
+
+test("a year stated in the quote is recovered when the model omits it, but never guessed", () => {
+  const base = { title: "x", kind: "deadline", time: "", endTime: "", location: "" };
+  assert.equal(validateEvent({ ...base, date: "10-27", source: "Son Başvuru: 27 Ekim 2026" })?.date, "2026-10-27");
+  assert.equal(validateEvent({ ...base, date: "10-27", source: "Son Başvuru: 27 Ekim" })?.date, "10-27");
+  assert.equal(validateEvent({ ...base, date: "10-27", source: "27 Ekim 2026 veya 2027" })?.date, "10-27");
+});
