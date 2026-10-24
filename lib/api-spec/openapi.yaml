@@ -57,13 +57,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/InterpretResult"
         "400":
-          description: Bad request
+          description: Bad request or unsupported image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Image too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit or model quota reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Model unavailable or returned an unusable answer
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: Live analysis not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: Model timed out
           content:
             application/json:
               schema:
@@ -99,20 +123,32 @@ components:
         image:
           type: string
           description: Data URL (jpeg/png/webp base64) of a photographed notice
+    EvidenceStatus:
+      type: string
+      enum: [verified, unverified, none, ai-extracted]
+      description: >
+        verified = the quote was found in the pasted text by a deterministic check.
+        unverified = the quote was NOT found in the pasted text.
+        none = the model gave no quote.
+        ai-extracted = the quote was read from an image by the model and is not checked.
     PlanStep:
       type: object
-      required: [title, detail, source]
+      required: [title, detail, source, evidence]
       properties:
         title: { type: string }
         detail: { type: string }
-        source: { type: string, description: Verbatim original-language evidence quote, may be empty }
+        source: { type: string, description: Original-language evidence quote proposed by the model, may be empty }
+        evidence:
+          $ref: "#/components/schemas/EvidenceStatus"
     PlanFact:
       type: object
-      required: [label, value, source]
+      required: [label, value, source, evidence]
       properties:
         label: { type: string }
         value: { type: string }
         source: { type: string }
+        evidence:
+          $ref: "#/components/schemas/EvidenceStatus"
     PlanPhrase:
       type: object
       required: [native, meaning]
@@ -148,8 +184,23 @@ components:
         mode:
           type: string
           enum: [live]
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - invalid_image
+        - image_too_large
+        - rate_limited
+        - quota_exceeded
+        - not_configured
+        - timeout
+        - upstream_unavailable
+        - bad_model_response
+        - server_error
     ErrorResponse:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error: { type: string }
+        code:
+          $ref: "#/components/schemas/ErrorCode"

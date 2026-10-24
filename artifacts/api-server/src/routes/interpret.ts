@@ -31,11 +31,11 @@ router.get("/interpret/status", (_req, res) => {
 router.post("/interpret", async (req, res) => {
   const parsed = InterpretNoticeBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request." });
+    res.status(400).json({ error: "Invalid request.", code: "invalid_request" });
     return;
   }
   if (limited(req.ip ?? "unknown")) {
-    res.status(429).json({ error: "Too many requests. Please wait a minute and try again." });
+    res.status(429).json({ error: "Too many requests. Please wait a minute and try again.", code: "rate_limited" });
     return;
   }
   try {
@@ -44,14 +44,11 @@ router.post("/interpret", async (req, res) => {
   } catch (err) {
     if (err instanceof HttpError) {
       req.log.warn({ status: err.status }, err.message);
-      res.status(err.status).json({ error: err.message });
+      res.status(err.status).json({ error: err.message, code: err.code });
       return;
     }
-    const timedOut = err instanceof Error && err.name === "TimeoutError";
     req.log.error({ err }, "interpret failed");
-    res
-      .status(timedOut ? 504 : 500)
-      .json({ error: timedOut ? "The model timed out. Please try again." : "Something went wrong. Please try again." });
+    res.status(500).json({ error: "Something went wrong. Please try again.", code: "server_error" });
   }
 });
 

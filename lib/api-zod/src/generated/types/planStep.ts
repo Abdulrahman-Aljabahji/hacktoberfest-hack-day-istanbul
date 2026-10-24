@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { EvidenceStatus } from './evidenceStatus';
 
 export interface PlanStep {
   title: string;
   detail: string;
-  /** Verbatim original-language evidence quote */
+  /** Original-language evidence quote proposed by the model */
   source: string;
+  evidence: EvidenceStatus;
 }

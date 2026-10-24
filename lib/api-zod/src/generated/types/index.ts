@@ -8,7 +8,9 @@
 
 export * from './actionPlan';
 export * from './actionPlanSourceLang';
+export * from './errorCode';
 export * from './errorResponse';
+export * from './evidenceStatus';
 export * from './healthStatus';
 export * from './interpretInput';
 export * from './interpretInputLang';

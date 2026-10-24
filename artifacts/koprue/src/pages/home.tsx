@@ -1,34 +1,52 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Camera, Check, Copy, Quote, RotateCcw, Type, Upload, Volume2 } from 'lucide-react';
+import { Camera, Check, Copy, Quote, RotateCcw, ShieldCheck, TriangleAlert, Type, Upload, Volume2 } from 'lucide-react';
 import { interpretNotice, useGetInterpretStatus } from '@workspace/api-client-react';
-import type { ActionPlan } from '@workspace/api-client-react';
+import type { ActionPlan, EvidenceStatus } from '@workspace/api-client-react';
 import { BridgeScene } from '@/components/bridge-scene';
 import { SAMPLE, SAMPLE_NOTICE, T } from '@/lib/sample';
 import type { Lang } from '@/lib/sample';
+import { describeFailure, describeFileProblem } from '@/lib/errors';
+import type { Failure } from '@/lib/errors';
 
 type Source = { kind: 'sample' } | { kind: 'image'; value: string } | { kind: 'text'; value: string };
 type Status = 'ready' | 'loading' | 'error';
 
 const MAX = 25 * 1024 * 1024;
-const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-function Evidence({ quote, lang, id }: { quote: string; lang: Lang; id: string }) {
+const EV_STYLE: Record<EvidenceStatus, string> = {
+  verified: 'bg-secondary text-secondary-foreground',
+  unverified: 'border-2 border-primary text-primary bg-card',
+  'ai-extracted': 'border-2 border-secondary bg-accent/50',
+  none: 'text-muted-foreground',
+};
+
+function Evidence({ quote, evidence, lang, id }: { quote: string; evidence: EvidenceStatus; lang: Lang; id: string }) {
   const [open, setOpen] = useState(false);
-  if (!quote) return null;
+  const label = { verified: T[lang].evVerified, unverified: T[lang].evUnverified, 'ai-extracted': T[lang].evImage, none: T[lang].evNone }[evidence];
+  const Icon = evidence === 'verified' ? ShieldCheck : evidence === 'none' ? null : TriangleAlert;
+  const badge = (
+    <span data-testid={`badge-evidence-${id}`} data-evidence={evidence} className={`mono inline-flex items-center gap-1.5 px-2.5 py-1.5 ${EV_STYLE[evidence]}`}>
+      {Icon && <Icon size={13} aria-hidden="true" />} {label}
+    </span>
+  );
+  if (!quote) return <div className="mt-2">{badge}</div>;
   return (
     <div className="mt-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={`ev-${id}`}
-        onClick={() => setOpen((o) => !o)}
-        data-testid={`button-evidence-${id}`}
-        className="mono inline-flex items-center gap-1.5 border-2 border-secondary px-2.5 py-1.5 min-h-9 bg-card hover:bg-accent transition-colors"
-      >
-        <Quote size={13} aria-hidden="true" /> {open ? T[lang].hide : T[lang].evidence}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`ev-${id}`}
+          onClick={() => setOpen((o) => !o)}
+          data-testid={`button-evidence-${id}`}
+          className="mono inline-flex items-center gap-1.5 border-2 border-secondary px-2.5 py-1.5 min-h-9 bg-card hover:bg-accent transition-colors"
+        >
+          <Quote size={13} aria-hidden="true" /> {open ? T[lang].hide : T[lang].evidence}
+        </button>
+        {badge}
+      </div>
       {open && (
         <blockquote id={`ev-${id}`} lang="tr" dir="auto" data-testid={`text-evidence-${id}`} className="mt-2 border-s-4 border-primary bg-muted/70 px-3 py-2 font-medium text-sm break-words">
           {quote}
@@ -38,16 +56,22 @@ function Evidence({ quote, lang, id }: { quote: string; lang: Lang; id: string }
   );
 }
 
-function Skeleton() {
+// The wait is real model time, so this is a calm animation plus honest text. It is not a progress bar.
+function Loading() {
   return (
-    <div className="space-y-4" role="status" aria-label="Analyzing notice" data-testid="state-loading">
-      <div className="skeleton h-9 w-3/4" />
-      <div className="skeleton h-4 w-full" />
-      <div className="skeleton h-4 w-5/6" />
-      <div className="grid sm:grid-cols-3 gap-3">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-20" />)}</div>
-      {[0, 1, 2].map((i) => <div key={i} className="skeleton h-24" />)}
-      <div className="road" aria-hidden="true" />
-      <p className="mono text-muted-foreground">Building your bridge...</p>
+    <div className="space-y-5" role="status" aria-live="polite" data-testid="state-loading">
+      <div className="border-2 border-secondary bg-card p-5 shadow-[8px_8px_0_hsl(var(--accent))]">
+        <svg viewBox="0 0 320 96" className="w-full max-w-md h-auto" aria-hidden="true">
+          <path className="bridge-arc" d="M12 76C64 -6 256 -6 308 76" fill="none" stroke="hsl(var(--primary))" strokeWidth="5" strokeLinecap="round" />
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <rect key={i} className="plank" style={{ ['--i' as string]: i }} x={14 + i * 33} y="78" width="26" height="8" fill="hsl(var(--accent))" stroke="hsl(var(--secondary))" strokeWidth="1.5" />
+          ))}
+        </svg>
+        <p className="mono mt-3 font-bold">Gemma 4 is reading your notice</p>
+        <p className="mt-1 text-sm text-muted-foreground">This usually takes 5 to 10 seconds. Your original stays on the left, and the plan appears here when the model answers.</p>
+      </div>
+      <div className="skeleton h-24" aria-hidden="true" />
+      <div className="skeleton h-24" aria-hidden="true" />
     </div>
   );
 }
@@ -59,6 +83,7 @@ export default function Home() {
   const [src, setSrc] = useState<Source>({ kind: 'sample' });
   const [live, setLive] = useState<ActionPlan | null>(null);
   const [state, setState] = useState<Status>('ready');
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
@@ -85,6 +110,7 @@ export default function Home() {
     ctrl.current = c;
     const id = ++reqId.current;
     setSrc(s);
+    setFailure(null);
     setState('loading');
     if (scroll) resultRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     try {
@@ -95,8 +121,9 @@ export default function Home() {
       if (id !== reqId.current) return;
       setLive(res.plan);
       setState('ready');
-    } catch {
+    } catch (err) {
       if (id !== reqId.current || c.signal.aborted) return;
+      setFailure(describeFailure(err));
       setState('error');
     }
   }, [reduce]);
@@ -111,13 +138,19 @@ export default function Home() {
     reqId.current++;
     setSrc({ kind: 'sample' });
     setLive(null);
+    setFailure(null);
     setState('ready');
+  };
+
+  const pasteInstead = () => {
+    setTextOpen(true);
+    window.setTimeout(() => document.getElementById('paste')?.focus(), 50);
   };
 
   const handleFile = (file?: File | null) => {
     if (!file) return;
-    if (!OK_TYPES.includes(file.type)) return flash('Choose a JPG, PNG or WebP image.');
-    if (file.size > MAX) return flash('That image is too large. Please choose one under 25 MB.');
+    const problem = describeFileProblem(file, MAX);
+    if (problem) return flash(problem);
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -128,13 +161,13 @@ export default function Home() {
       canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
       const ctx = canvas.getContext('2d');
       URL.revokeObjectURL(url);
-      if (!ctx) return flash('Could not read the image.');
+      if (!ctx) return flash("This browser couldn't prepare the image. Try another photo or paste the text.");
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       void run({ kind: 'image', value: canvas.toDataURL('image/jpeg', 0.85) }, lang);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); flash('Could not read the image. Try a JPG or PNG.'); };
+    img.onerror = () => { URL.revokeObjectURL(url); flash("That image couldn't be opened. It may be damaged or in an unsupported format. Try a JPG or PNG, or paste the text."); };
     img.src = url;
   };
 
@@ -305,20 +338,34 @@ export default function Home() {
               </div>
             </div>
 
-            {state === 'loading' && <Skeleton />}
+            {state === 'loading' && <Loading />}
 
-            {state === 'error' && !isSample && (
-              <div role="alert" data-testid="state-error" className="border-2 border-secondary bg-card p-6 shadow-[8px_8px_0_hsl(var(--primary))]" dir="ltr" lang="en">
-                <h3 className="font-display font-extrabold text-2xl">The bridge didn't hold this time.</h3>
-                <p className="mt-2 text-muted-foreground">We could not read that notice right now. Check your connection, try a clearer photo, or try again in a moment.</p>
+            {state === 'error' && !isSample && failure && (
+              <div role="alert" data-testid="state-error" data-failure={failure.kind} className="border-2 border-secondary bg-card p-6 shadow-[8px_8px_0_hsl(var(--primary))]" dir="ltr" lang="en">
+                <h3 className="font-display font-extrabold text-2xl" data-testid="text-error-title">{failure.title}</h3>
+                <p className="mt-2 text-muted-foreground" data-testid="text-error-body">{failure.body}</p>
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <button type="button" onClick={() => void run(src, lang, false)} data-testid="button-retry" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Try again</button>
+                  {failure.retry && <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false)} data-testid="button-retry" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Try again</button>}
+                  {src.kind === 'image' && <button type="button" onClick={pasteInstead} data-testid="button-paste-instead" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent">Paste the text instead</button>}
                   <button type="button" onClick={resetSample} data-testid="button-error-reset" className="border-2 border-secondary font-bold px-5 min-h-11">Back to sample</button>
                 </div>
               </div>
             )}
 
-            {state === 'ready' && plan && (
+            {state === 'ready' && !isSample && plan && plan.steps.length === 0 && plan.facts.length === 0 && (
+              <div role="alert" data-testid="state-no-actions" className="border-2 border-secondary bg-card p-6 shadow-[8px_8px_0_hsl(var(--accent))]" dir="ltr" lang="en">
+                <h3 className="font-display font-extrabold text-2xl">No reliable actions found</h3>
+                <p className="mt-2 text-muted-foreground">KÖPRÜ could not find dates, places or tasks that it could back up from this {src.kind === 'image' ? 'image' : 'text'}. Nothing was guessed. Try a sharper, closer photo with the whole notice in frame, or paste the text.</p>
+                {plan.caution && <p className="mt-3 text-sm font-medium" data-testid="text-no-actions-caution"><strong className="mono me-2">Model note</strong>{plan.caution}</p>}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <button type="button" onClick={pasteInstead} data-testid="button-paste-instead" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Paste the text instead</button>
+                  <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false)} data-testid="button-retry" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent">Try again</button>
+                  <button type="button" onClick={resetSample} data-testid="button-error-reset" className="border-2 border-secondary font-bold px-5 min-h-11">Back to sample</button>
+                </div>
+              </div>
+            )}
+
+            {state === 'ready' && plan && (isSample || plan.steps.length > 0 || plan.facts.length > 0) && (
               <motion.article key={`${src.kind}-${lang}-${plan.headline}`} {...(reduce ? {} : { initial: { opacity: 0, y: 20, rotateX: 8 }, animate: { opacity: 1, y: 0, rotateX: 0 } })} className="space-y-8" data-testid="result-plan">
                 <div>
                   <h3 className="font-display font-extrabold text-3xl md:text-5xl leading-[1.02] tracking-tight" data-testid="text-headline">{plan.headline}</h3>
@@ -337,7 +384,7 @@ export default function Home() {
                         <div key={i} className="tilt-card bg-card border-2 border-secondary p-4 min-w-0" data-testid={`card-fact-${i}`}>
                           <p className="mono text-muted-foreground">{f.label}</p>
                           <p className="font-display font-bold text-xl mt-1 break-words">{f.value}</p>
-                          <Evidence quote={f.source} lang={lang} id={`fact-${i}`} />
+                          <Evidence quote={f.source} evidence={f.evidence} lang={lang} id={`fact-${i}`} />
                         </div>
                       ))}
                     </div>
@@ -353,7 +400,7 @@ export default function Home() {
                         <div className="min-w-0">
                           <h5 className="font-display font-bold text-xl leading-tight">{s.title}</h5>
                           <p className="mt-1 text-muted-foreground">{s.detail}</p>
-                          <Evidence quote={s.source} lang={lang} id={`step-${i}`} />
+                          <Evidence quote={s.source} evidence={s.evidence} lang={lang} id={`step-${i}`} />
                         </div>
                       </li>
                     ))}
@@ -392,7 +439,7 @@ export default function Home() {
           {[
             ['01', 'See', 'A photo or pasted text goes in. No perfect prompt, no translation app juggling.', 'md:col-span-5'],
             ['02', 'Span', 'Gemma 4 pulls out deadlines, places and obligations as steps, not a wall of translated text.', 'md:col-span-4 md:mt-8'],
-            ['03', 'Step', 'Every claim carries its verbatim Turkish quote, plus a sentence to say at the counter.', 'md:col-span-3 md:mt-16'],
+            ['03', 'Step', 'Every claim carries the quote it came from, checked against your text when you paste it, plus a sentence to say at the counter.', 'md:col-span-3 md:mt-16'],
           ].map(([n, h, p, c]) => (
             <motion.div key={n} {...rise} className={`${c} tilt-card bg-card border-2 border-secondary p-6`}>
               <span className="mono text-primary">{n}</span>

@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -31,5 +31,21 @@ app.use(express.json({ limit: "7mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Last-resort handler: oversized or malformed bodies get a clear, safe answer.
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(err);
+  const type = (err as { type?: string } | null)?.type;
+  if (type === "entity.too.large") {
+    res.status(413).json({ error: "That upload is too large.", code: "image_too_large" });
+    return;
+  }
+  if (type === "entity.parse.failed") {
+    res.status(400).json({ error: "Invalid request.", code: "invalid_request" });
+    return;
+  }
+  req.log?.error({ err }, "unhandled error");
+  res.status(500).json({ error: "Something went wrong. Please try again.", code: "server_error" });
+});
 
 export default app;

@@ -35,17 +35,32 @@ export interface InterpretInput {
   image?: string;
 }
 
+/**
+ * verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.
+ */
+export type EvidenceStatus = typeof EvidenceStatus[keyof typeof EvidenceStatus];
+
+
+export const EvidenceStatus = {
+  verified: 'verified',
+  unverified: 'unverified',
+  none: 'none',
+  'ai-extracted': 'ai-extracted',
+} as const;
+
 export interface PlanStep {
   title: string;
   detail: string;
-  /** Verbatim original-language evidence quote */
+  /** Original-language evidence quote proposed by the model */
   source: string;
+  evidence: EvidenceStatus;
 }
 
 export interface PlanFact {
   label: string;
   value: string;
   source: string;
+  evidence: EvidenceStatus;
 }
 
 export interface PlanPhrase {
@@ -84,7 +99,24 @@ export interface InterpretResult {
   mode: InterpretResultMode;
 }
 
+export type ErrorCode = typeof ErrorCode[keyof typeof ErrorCode];
+
+
+export const ErrorCode = {
+  invalid_request: 'invalid_request',
+  invalid_image: 'invalid_image',
+  image_too_large: 'image_too_large',
+  rate_limited: 'rate_limited',
+  quota_exceeded: 'quota_exceeded',
+  not_configured: 'not_configured',
+  timeout: 'timeout',
+  upstream_unavailable: 'upstream_unavailable',
+  bad_model_response: 'bad_model_response',
+  server_error: 'server_error',
+} as const;
+
 export interface ErrorResponse {
   error: string;
+  code: ErrorCode;
 }
 

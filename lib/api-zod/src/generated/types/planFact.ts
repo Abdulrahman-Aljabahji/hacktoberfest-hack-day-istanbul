@@ -5,9 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { EvidenceStatus } from './evidenceStatus';
 
 export interface PlanFact {
   label: string;
   value: string;
   source: string;
+  evidence: EvidenceStatus;
 }

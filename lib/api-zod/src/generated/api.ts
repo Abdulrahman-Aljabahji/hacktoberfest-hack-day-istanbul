@@ -43,12 +43,14 @@ export const InterpretNoticeResponse = zod.object({
   "steps": zod.array(zod.object({
   "title": zod.string(),
   "detail": zod.string(),
-  "source": zod.string().describe('Verbatim original-language evidence quote')
+  "source": zod.string().describe('Original-language evidence quote proposed by the model'),
+  "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
 })),
   "facts": zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
-  "source": zod.string()
+  "source": zod.string(),
+  "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
 })),
   "phrase": zod.object({
   "native": zod.string(),
