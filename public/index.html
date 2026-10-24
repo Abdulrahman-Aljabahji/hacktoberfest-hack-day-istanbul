@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090f1d" />
+  <meta name="description" content="KÖPRÜ turns confusing notices into clear, evidence-backed action plans in your language." />
+  <title>KÖPRÜ — Make sense of the world</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="light-aura" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="header">
+      <a class="brand" href="#top" aria-label="Köprü home"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span><span>KÖPRÜ<span class="brand-dot">.</span></span></a>
+      <nav class="nav" aria-label="Primary navigation"><a href="#how">How it works</a><a href="#experience">Experience</a></nav>
+      <div class="header-right"><span class="header-bullet" aria-hidden="true"></span><span id="connection-label">Sample mode ready</span><a class="github-link" href="https://github.com/new" target="_blank" rel="noreferrer" aria-label="Create a public GitHub repository for this project">Publish on GitHub <span aria-hidden="true">↗</span></a></div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-left">
+          <div class="eyebrow"><span class="status-pip"></span> HUMAN-FIRST AI <span class="eyebrow-separator">/</span> MADE FOR EVERY LANGUAGE</div>
+          <h1 id="hero-title">The world is full of instructions.<br/><em>Now they make sense.</em></h1>
+          <p class="hero-sub">From a confusing poster to a clear next step. Point KÖPRÜ at something you don't understand, and watch it become something you can <strong>act on.</strong></p>
+          <div class="input-card" id="input-card">
+            <div class="input-header"><span class="input-index">01 / START HERE</span><span class="secure-label"><span aria-hidden="true">◌</span> No account needed</span></div>
+            <div class="drop" id="drop-zone" role="group" aria-label="Upload an image">
+              <div class="drop-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+              <div><strong>Drop a photo or screenshot</strong><span class="drop-meta">JPG, PNG or WebP · up to 4 MB · uploads use Google API</span></div>
+              <button class="small-cta" id="upload-btn" type="button">Choose image <span aria-hidden="true">↗</span></button>
+              <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+            </div>
+            <div class="or"><span></span><span>OR</span><span></span></div>
+            <div class="input-actions"><button id="sample-btn" class="sample-btn" type="button"><span class="spark">✳</span> Experience a live example <span aria-hidden="true">↗</span></button><button id="text-toggle" class="text-btn" type="button" aria-expanded="false" aria-controls="text-panel">Paste text instead <span aria-hidden="true">⌄</span></button></div>
+            <div class="text-panel" id="text-panel" hidden><label for="text-input">Paste a notice, email or instruction</label><textarea id="text-input" placeholder="Paste Turkish, English or Arabic text here…" maxlength="6000"></textarea><button type="button" class="analyze-btn" id="analyze-text">Make it make sense <span aria-hidden="true">→</span></button></div>
+          </div>
+          <div class="micro-proof"><span class="micro-stars" aria-hidden="true">✦ ✦ ✦</span><span>Language is not a barrier. Confusion doesn't have to be either.</span></div>
+        </div>
+        <div class="hero-right" aria-label="Visual demonstration of KÖPRÜ">
+          <div class="ambient-ring ring-one"></div><div class="ambient-ring ring-two"></div>
+          <div class="visual-caption"><span>BEFORE <span class="caption-arrow">→</span> AFTER</span><span>© KÖPRÜ LAB / 2026</span></div>
+          <div class="floating-paper">
+            <div class="paper-head"><div class="paper-emblem">İ</div><span>İSTANBUL<br/>TOPLULUK PANOSU</span><span class="paper-ref">024 / 26</span></div>
+            <div class="paper-rule"></div><div class="paper-kicker">DUYURU / BİLGİLENDİRME</div>
+            <h2>ÜCRETSİZ<br/>YAZILIM<br/>ATÖLYESİ</h2>
+            <p>Kayıt için <mark>28 Ekim saat 15.00'e kadar</mark> formu doldurunuz.</p>
+            <p>Atölye <mark>29 Ekim saat 14.00'te</mark> B Blok Zemin Kat Salon 2'de yapılacaktır.</p>
+            <p><mark>Kimliğinizi ve dizüstü bilgisayarınızı</mark> getirmeyi unutmayınız.</p>
+            <div class="paper-end"><span>HAYDİ ÜRETELİM!</span><span class="fake-qr" aria-hidden="true"></span></div>
+            <div class="paper-demo-stamp">ILLUSTRATIVE SAMPLE</div>
+          </div>
+          <div class="floating-translation"><div class="translate-label"><span class="circle-check">✓</span> KÖPRÜ FOUND YOUR NEXT STEP</div><div class="translation-big">Register before<br/><strong>Oct 28, 3 PM.</strong></div><div class="translation-bottom"><span>Action, not just translation.</span><span class="arrow-round">↗</span></div></div>
+          <div class="visual-noise">WHAT IF UNDERSTANDING FELT INSTANT?</div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="Product promises"><div><span class="promise-icon">◎</span> MULTIMODAL UNDERSTANDING</div><div><span class="promise-icon">⌘</span> REAL NEXT STEPS</div><div><span class="promise-icon">◍</span> ORIGINAL SOURCE EVIDENCE</div><div><span class="promise-icon">✳</span> OPEN-WEIGHT AI</div></section>
+
+      <section class="experience" id="experience" aria-labelledby="experience-title">
+        <div class="section-head"><div><span class="section-index">THE EXPERIENCE / 02</span><h2 id="experience-title">Clarity, in <i>your</i> language.</h2><p id="source-description">Try our fictional Turkish workshop notice. The sample runs without an API key; your own images use Gemma 4.</p></div><div class="language"><label for="language-select">EXPLAIN IN</label><select id="language-select" aria-label="Select explanation language"><option value="en">English</option><option value="ar">العربية</option><option value="tr">Türkçe</option></select></div></div>
+        <div class="result-layout">
+          <aside class="original-card" aria-label="Source material"><div class="card-label"><span><span class="yellow-dot"></span> ORIGINAL SOURCE</span><span id="source-type">DEMO NOTICE</span></div><div id="source-preview" class="original-content"><div class="original-kicker">ORIGINAL / TÜRKÇE</div><h3>ÜCRETSİZ YAZILIM ATÖLYESİ</h3><p>Kayıt için 28 Ekim saat 15.00'e kadar formu doldurunuz.</p><p>Atölye 29 Ekim saat 14.00'te B Blok Zemin Kat Salon 2'de yapılacaktır.</p><p>Kimliğinizi ve dizüstü bilgisayarınızı getirmeyi unutmayınız.</p></div><p class="source-footnote" id="source-footnote">Sample notice invented for demonstration. Not an actual event announcement.</p><div id="evidence-box" class="evidence-box" hidden><span>ORIGINAL EVIDENCE</span><p id="evidence-text"></p></div></aside>
+          <div class="result-card" id="result-card" aria-live="polite"><div class="card-label"><span><span class="green-dot"></span> YOUR NEW INTERFACE</span><span id="mode-label">READY WHEN YOU ARE</span></div><div id="empty-state" class="empty-state"><div class="empty-glyph" aria-hidden="true">✳</div><h3>Let's make it clear.</h3><p>Choose the sample above to see the transformation, or upload your own notice to create a fresh action plan.</p><button id="empty-demo-btn" class="analyze-btn" type="button">Show me the magic <span aria-hidden="true">↗</span></button></div><div id="loading-state" class="loading-state" hidden><div class="loading-orbit" aria-hidden="true"><span>✳</span></div><h3>Making sense of it…</h3><p>Finding the important details and turning them into next steps.</p><div class="loading-bars" aria-hidden="true"><span></span><span></span><span></span></div></div><div id="error-state" class="error-state" hidden><strong>Couldn't complete the analysis.</strong><p id="error-message"></p><button id="retry-btn" type="button" class="retry-btn">Try again ↗</button></div><div id="plan-state" hidden></div></div>
+        </div>
+      </section>
+
+      <section class="how" id="how" aria-labelledby="how-title"><div class="how-head"><span class="section-index">WHY IT'S DIFFERENT / 03</span><h2 id="how-title">Not another chatbot.<br/><i>A new kind of interface.</i></h2></div><div class="how-grid"><article><span>01 / SEE</span><div class="how-symbol">◩</div><h3>Understand the scene</h3><p>Gemma 4 reads what you share, whether it's an image or text. No perfect prompt needed.</p></article><article><span>02 / MAKE SENSE</span><div class="how-symbol">↝</div><h3>Turn words into actions</h3><p>Extract the real requirements, important dates and concrete next steps—not just a translation.</p></article><article><span>03 / TRUST</span><div class="how-symbol">⌁</div><h3>Show your work</h3><p>Tap any evidence quote to verify the original wording, then listen to a useful phrase out loud.</p></article></div></section>
+    </main>
+    <footer class="footer"><div class="footer-brand">KÖPRÜ<span>.</span></div><p>Built for humans, powered by open-weight AI.<br/>Made with curiosity for Hacktoberfest Istanbul 2026.</p><span>OPEN SOURCE BY DESIGN <span aria-hidden="true">↗</span></span></footer>
+  </div>
+  <div id="toast" role="status" class="toast" hidden></div>
+</body>
+</html>

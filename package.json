@@ -1,0 +1,14 @@
+{
+  "name": "kopru-reality-to-action",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn confusing notices and images into clear multilingual action plans with Gemma 4.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
