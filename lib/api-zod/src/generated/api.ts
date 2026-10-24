@@ -52,6 +52,22 @@ export const InterpretNoticeResponse = zod.object({
   "source": zod.string(),
   "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
 })),
+  "events": zod.array(zod.object({
+  "title": zod.string(),
+  "kind": zod.enum(['event', 'deadline']).describe('event = something that starts at that time; deadline = last moment to do something (e.g. registration)'),
+  "date": zod.string().describe('YYYY-MM-DD, or MM-DD when the notice does not state a year'),
+  "time": zod.string().describe('HH:MM 24h, or empty when the notice gives no time'),
+  "endTime": zod.string().describe('HH:MM 24h, or empty'),
+  "location": zod.string().describe('Place as written in the notice'),
+  "source": zod.string(),
+  "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
+})),
+  "requirements": zod.array(zod.object({
+  "text": zod.string().describe('A document'),
+  "source": zod.string(),
+  "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
+})),
+  "missing": zod.array(zod.string()).describe('Important things a reader would expect that the notice does not say'),
   "phrase": zod.object({
   "native": zod.string(),
   "meaning": zod.string()
@@ -59,6 +75,30 @@ export const InterpretNoticeResponse = zod.object({
   "caution": zod.string()
 }),
   "mode": zod.enum(['live'])
+})
+
+
+/**
+ * @summary Answer a question strictly from the supplied notice (stateless, nothing is stored)
+ */
+export const askNoticeBodyQuestionMax = 300;
+
+
+
+export const AskNoticeBody = zod.object({
+  "lang": zod.enum(['en', 'tr', 'ar']),
+  "question": zod.string().max(askNoticeBodyQuestionMax),
+  "text": zod.string().optional(),
+  "image": zod.string().optional()
+})
+
+export const AskNoticeResponse = zod.object({
+  "found": zod.boolean().describe('false when the notice does not contain the answer'),
+  "answer": zod.string(),
+  "evidence": zod.array(zod.object({
+  "quote": zod.string(),
+  "evidence": zod.enum(['verified', 'unverified', 'none', 'ai-extracted']).describe('verified = the quote was found in the pasted text by a deterministic check. unverified = the quote was NOT found in the pasted text. none = the model gave no quote. ai-extracted = the quote was read from an image by the model and is not checked.\n')
+}))
 })
 
 

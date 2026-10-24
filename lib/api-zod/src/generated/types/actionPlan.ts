@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ActionPlanSourceLang } from './actionPlanSourceLang';
+import type { PlanEvent } from './planEvent';
 import type { PlanFact } from './planFact';
 import type { PlanPhrase } from './planPhrase';
+import type { PlanRequirement } from './planRequirement';
 import type { PlanStep } from './planStep';
 
 export interface ActionPlan {
@@ -16,6 +18,10 @@ export interface ActionPlan {
   sourceLang: ActionPlanSourceLang;
   steps: PlanStep[];
   facts: PlanFact[];
+  events: PlanEvent[];
+  requirements: PlanRequirement[];
+  /** Important things a reader would expect that the notice does not say */
+  missing: string[];
   phrase: PlanPhrase;
   caution: string;
 }

@@ -8,6 +8,10 @@
 
 export * from './actionPlan';
 export * from './actionPlanSourceLang';
+export * from './askInput';
+export * from './askInputLang';
+export * from './askQuote';
+export * from './askResult';
 export * from './errorCode';
 export * from './errorResponse';
 export * from './evidenceStatus';
@@ -17,6 +21,9 @@ export * from './interpretInputLang';
 export * from './interpretResult';
 export * from './interpretResultMode';
 export * from './interpretStatus';
+export * from './planEvent';
+export * from './planEventKind';
 export * from './planFact';
 export * from './planPhrase';
+export * from './planRequirement';
 export * from './planStep';

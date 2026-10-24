@@ -92,6 +92,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /ask:
+    post:
+      operationId: askNotice
+      tags: [interpret]
+      summary: Answer a question strictly from the supplied notice (stateless, nothing is stored)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskInput"
+      responses:
+        "200":
+          description: Answer with supporting quotes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskResult"
+        "400":
+          description: Bad request or unsupported image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Image too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit or model quota reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Model unavailable or returned an unusable answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Live analysis not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: Model timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -149,6 +203,30 @@ components:
         source: { type: string }
         evidence:
           $ref: "#/components/schemas/EvidenceStatus"
+    PlanRequirement:
+      type: object
+      required: [text, source, evidence]
+      properties:
+        text: { type: string, description: A document, item or condition the notice asks for }
+        source: { type: string }
+        evidence:
+          $ref: "#/components/schemas/EvidenceStatus"
+    PlanEvent:
+      type: object
+      required: [title, kind, date, time, endTime, location, source, evidence]
+      properties:
+        title: { type: string }
+        kind:
+          type: string
+          enum: [event, deadline]
+          description: event = something that starts at that time; deadline = last moment to do something (e.g. registration)
+        date: { type: string, description: "YYYY-MM-DD, or MM-DD when the notice does not state a year" }
+        time: { type: string, description: "HH:MM 24h, or empty when the notice gives no time" }
+        endTime: { type: string, description: "HH:MM 24h, or empty" }
+        location: { type: string, description: Place as written in the notice, or empty }
+        source: { type: string }
+        evidence:
+          $ref: "#/components/schemas/EvidenceStatus"
     PlanPhrase:
       type: object
       required: [native, meaning]
@@ -157,7 +235,7 @@ components:
         meaning: { type: string }
     ActionPlan:
       type: object
-      required: [headline, summary, sourceLang, steps, facts, phrase, caution]
+      required: [headline, summary, sourceLang, steps, facts, events, requirements, missing, phrase, caution]
       properties:
         headline: { type: string }
         summary: { type: string }
@@ -172,6 +250,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlanFact"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanEvent"
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanRequirement"
+        missing:
+          type: array
+          items: { type: string }
+          description: Important things a reader would expect that the notice does not say
         phrase:
           $ref: "#/components/schemas/PlanPhrase"
         caution: { type: string }
@@ -184,6 +274,33 @@ components:
         mode:
           type: string
           enum: [live]
+    AskInput:
+      type: object
+      required: [lang, question]
+      properties:
+        lang:
+          type: string
+          enum: [en, tr, ar]
+        question: { type: string, maxLength: 300 }
+        text: { type: string }
+        image: { type: string }
+    AskQuote:
+      type: object
+      required: [quote, evidence]
+      properties:
+        quote: { type: string }
+        evidence:
+          $ref: "#/components/schemas/EvidenceStatus"
+    AskResult:
+      type: object
+      required: [found, answer, evidence]
+      properties:
+        found: { type: boolean, description: false when the notice does not contain the answer }
+        answer: { type: string }
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/AskQuote"
     ErrorCode:
       type: string
       enum:

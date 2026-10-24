@@ -1,0 +1,1 @@
+- [KÖPRÜ trust/action rules](koprue-design-decisions.md) — evidence, calendar and Ask invariants

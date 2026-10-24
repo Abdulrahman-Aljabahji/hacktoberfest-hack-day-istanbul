@@ -129,3 +129,23 @@ body::after {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
   .tilt-card:hover { transform: none !important; }
 }
+
+/* Action Passport: invisible on screen, the only thing printed. */
+.passport-print { display: none; }
+@page { size: A4; margin: 12mm; }
+@media print {
+  .app-root > *:not(.passport-print) { display: none !important; }
+  .passport-print { display: block !important; color: #111; background: #fff; font-size: 10.5pt; line-height: 1.35; }
+  .passport-print h1 { font-size: 18pt; line-height: 1.1; margin: 2pt 0; }
+  .passport-print h2 { font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1.5pt solid #111; margin: 10pt 0 4pt; padding-bottom: 2pt; }
+  .passport-print ul, .passport-print ol { margin: 0; padding-inline-start: 14pt; }
+  .passport-print li { margin-bottom: 4pt; break-inside: avoid; }
+  .passport-print .pp-brand { font-weight: 800; letter-spacing: .06em; }
+  .passport-print .pp-meta, .passport-print .pp-quote { font-size: 8.5pt; color: #333; margin: 1pt 0 0; }
+  .passport-print .pp-status { font-weight: 700; }
+  .passport-print .pp-unverified, .passport-print .pp-ai-extracted, .passport-print .pp-none { text-decoration: underline; }
+  .passport-print .pp-checklist { list-style: none; padding: 0; }
+  .passport-print .pp-checklist li { display: flex; gap: 6pt; }
+  .passport-print .pp-box { font-size: 13pt; line-height: 1; }
+  .passport-print .pp-warn li { font-weight: 600; }
+}

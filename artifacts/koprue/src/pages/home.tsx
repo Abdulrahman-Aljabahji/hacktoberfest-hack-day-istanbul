@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Camera, Check, Copy, Quote, RotateCcw, ShieldCheck, TriangleAlert, Type, Upload, Volume2 } from 'lucide-react';
+import { Camera, Check, Copy, Printer, RotateCcw, Type, Upload, Volume2 } from 'lucide-react';
 import { interpretNotice, useGetInterpretStatus } from '@workspace/api-client-react';
-import type { ActionPlan, EvidenceStatus } from '@workspace/api-client-react';
+import type { ActionPlan } from '@workspace/api-client-react';
 import { BridgeScene } from '@/components/bridge-scene';
+import { ActionPassport } from '@/components/action-passport';
+import { AskNotice } from '@/components/ask-notice';
+import { CalendarExport } from '@/components/calendar-export';
+import { ChecklistProgress, StepToggle } from '@/components/checklist';
+import { Evidence } from '@/components/evidence';
+import { A } from '@/lib/i18n-actions';
 import { SAMPLE, SAMPLE_NOTICE, T } from '@/lib/sample';
 import type { Lang } from '@/lib/sample';
 import { describeFailure, describeFileProblem } from '@/lib/errors';
@@ -14,47 +20,6 @@ type Source = { kind: 'sample' } | { kind: 'image'; value: string } | { kind: 't
 type Status = 'ready' | 'loading' | 'error';
 
 const MAX = 25 * 1024 * 1024;
-
-const EV_STYLE: Record<EvidenceStatus, string> = {
-  verified: 'bg-secondary text-secondary-foreground',
-  unverified: 'border-2 border-primary text-primary bg-card',
-  'ai-extracted': 'border-2 border-secondary bg-accent/50',
-  none: 'text-muted-foreground',
-};
-
-function Evidence({ quote, evidence, lang, id }: { quote: string; evidence: EvidenceStatus; lang: Lang; id: string }) {
-  const [open, setOpen] = useState(false);
-  const label = { verified: T[lang].evVerified, unverified: T[lang].evUnverified, 'ai-extracted': T[lang].evImage, none: T[lang].evNone }[evidence];
-  const Icon = evidence === 'verified' ? ShieldCheck : evidence === 'none' ? null : TriangleAlert;
-  const badge = (
-    <span data-testid={`badge-evidence-${id}`} data-evidence={evidence} className={`mono inline-flex items-center gap-1.5 px-2.5 py-1.5 ${EV_STYLE[evidence]}`}>
-      {Icon && <Icon size={13} aria-hidden="true" />} {label}
-    </span>
-  );
-  if (!quote) return <div className="mt-2">{badge}</div>;
-  return (
-    <div className="mt-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={`ev-${id}`}
-          onClick={() => setOpen((o) => !o)}
-          data-testid={`button-evidence-${id}`}
-          className="mono inline-flex items-center gap-1.5 border-2 border-secondary px-2.5 py-1.5 min-h-9 bg-card hover:bg-accent transition-colors"
-        >
-          <Quote size={13} aria-hidden="true" /> {open ? T[lang].hide : T[lang].evidence}
-        </button>
-        {badge}
-      </div>
-      {open && (
-        <blockquote id={`ev-${id}`} lang="tr" dir="auto" data-testid={`text-evidence-${id}`} className="mt-2 border-s-4 border-primary bg-muted/70 px-3 py-2 font-medium text-sm break-words">
-          {quote}
-        </blockquote>
-      )}
-    </div>
-  );
-}
 
 // The wait is real model time, so this is a calm animation plus honest text. It is not a progress bar.
 function Loading() {
@@ -84,6 +49,10 @@ export default function Home() {
   const [live, setLive] = useState<ActionPlan | null>(null);
   const [state, setState] = useState<Status>('ready');
   const [failure, setFailure] = useState<Failure | null>(null);
+  // docId changes whenever a different document is analyzed. Checklist and Q&A reset with it. Nothing is persisted.
+  const [docId, setDocId] = useState(0);
+  const [done, setDone] = useState<Set<number>>(new Set());
+  const lastSrc = useRef<string>('sample');
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
@@ -109,6 +78,11 @@ export default function Home() {
     const c = new AbortController();
     ctrl.current = c;
     const id = ++reqId.current;
+    if (lastSrc.current !== `${s.kind}:${s.value}`) {
+      lastSrc.current = `${s.kind}:${s.value}`;
+      setDocId((n) => n + 1);
+      setDone(new Set());
+    }
     setSrc(s);
     setFailure(null);
     setState('loading');
@@ -136,6 +110,9 @@ export default function Home() {
   const resetSample = () => {
     ctrl.current?.abort();
     reqId.current++;
+    lastSrc.current = 'sample';
+    setDocId((n) => n + 1);
+    setDone(new Set());
     setSrc({ kind: 'sample' });
     setLive(null);
     setFailure(null);
@@ -183,6 +160,9 @@ export default function Home() {
   const plan: ActionPlan | null = isSample ? SAMPLE[lang] : live;
   const t = T[lang];
   const rtl = lang === 'ar';
+  const a = A[lang];
+  const toggleDone = (i: number) => setDone((d) => { const n = new Set(d); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+  const askSource = src.kind === 'image' ? { image: src.value } : { text: src.kind === 'text' ? src.value : [SAMPLE_NOTICE.title, ...SAMPLE_NOTICE.lines].join('\n') };
 
   const speak = () => {
     if (!plan || !('speechSynthesis' in window)) return flash('Speech is unavailable in this browser.');
@@ -220,7 +200,7 @@ export default function Home() {
   const rise = reduce ? {} : { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-60px' }, transition: { duration: 0.6 } };
 
   return (
-    <div className="min-h-[100dvh] overflow-x-clip">
+    <div className="app-root min-h-[100dvh] overflow-x-clip">
       {/* HERO */}
       <section className="on-ink bg-secondary text-secondary-foreground relative overflow-hidden" aria-labelledby="hero-title">
         <div className="absolute inset-x-0 bottom-0 h-px bg-accent/40" aria-hidden="true" />
@@ -393,19 +373,44 @@ export default function Home() {
 
                 <section aria-label={t.steps}>
                   <h4 className="mono mb-3">{plan.steps.length ? t.steps : t.none}</h4>
+                  <ChecklistProgress done={[...done].filter((i) => i < plan.steps.length).length} total={plan.steps.length} lang={lang} />
                   <ol className="relative space-y-4">
                     {plan.steps.map((s, i) => (
-                      <li key={i} className="tilt-card flex gap-4 bg-card border-2 border-secondary p-4 min-w-0" data-testid={`card-step-${i}`}>
+                      <li key={i} className={`tilt-card flex gap-4 border-2 border-secondary p-4 min-w-0 transition-colors ${done.has(i) ? 'bg-accent/40' : 'bg-card'}`} data-testid={`card-step-${i}`} data-done={done.has(i)}>
                         <span className="font-display font-extrabold text-4xl text-primary leading-none shrink-0" dir="ltr">{String(i + 1).padStart(2, '0')}</span>
                         <div className="min-w-0">
-                          <h5 className="font-display font-bold text-xl leading-tight">{s.title}</h5>
+                          <h5 className={`font-display font-bold text-xl leading-tight ${done.has(i) ? 'line-through decoration-2 decoration-primary' : ''}`}>{s.title}</h5>
                           <p className="mt-1 text-muted-foreground">{s.detail}</p>
                           <Evidence quote={s.source} evidence={s.evidence} lang={lang} id={`step-${i}`} />
+                          <StepToggle done={done.has(i)} onToggle={() => toggleDone(i)} lang={lang} id={`step-${i}`} />
                         </div>
                       </li>
                     ))}
                   </ol>
                 </section>
+
+                {plan.requirements.length > 0 && (
+                  <section aria-label={a.ppRequirements}>
+                    <h4 className="mono mb-3">{a.ppRequirements}</h4>
+                    <ul className="space-y-3">
+                      {plan.requirements.map((r, i) => (
+                        <li key={i} className="bg-card border-2 border-secondary p-4 min-w-0" data-testid={`card-requirement-${i}`}>
+                          <p className="font-medium">{r.text}</p>
+                          <Evidence quote={r.source} evidence={r.evidence} lang={lang} id={`req-${i}`} />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                <CalendarExport key={`cal-${docId}-${lang}`} events={plan.events} lang={lang} />
+
+                {plan.missing.length > 0 && (
+                  <section aria-label={a.ppMissing} className="border-2 border-primary p-4" data-testid="section-missing">
+                    <h4 className="mono text-primary mb-2">{a.ppMissing}</h4>
+                    <ul className="list-disc ps-5 space-y-1 text-sm font-medium">{plan.missing.map((m, i) => <li key={i}>{m}</li>)}</ul>
+                  </section>
+                )}
 
                 {plan.phrase?.native && (
                   <section aria-label={t.say} className="on-ink bg-secondary text-secondary-foreground p-5 md:p-6 shadow-[8px_8px_0_hsl(var(--accent))]" data-testid="card-phrase">
@@ -419,8 +424,11 @@ export default function Home() {
                   </section>
                 )}
 
+                <AskNotice key={`ask-${docId}`} lang={lang} source={askSource} available={Boolean(connected)} />
+
                 <div className="flex flex-wrap items-center gap-3 border-t-2 border-secondary pt-5">
                   <button type="button" onClick={() => void copy('plan')} data-testid="button-copy-plan" className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-bold px-5 min-h-11">{copied === 'plan' ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />} {t.plan}</button>
+                  <button type="button" onClick={() => window.print()} data-testid="button-passport" title={a.ppHelp} className="inline-flex items-center gap-2 border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent transition-colors"><Printer size={18} aria-hidden="true" /> {a.ppButton}</button>
                   <p className="text-xs text-muted-foreground flex-1 min-w-[12rem]">{t.verify}</p>
                 </div>
                 {!isSample && (
@@ -466,6 +474,10 @@ export default function Home() {
           </ul>
         </div>
       </footer>
+
+      {plan && state === 'ready' && (isSample || plan.steps.length > 0 || plan.facts.length > 0) && (
+        <ActionPassport plan={plan} lang={lang} done={done} kind={src.kind} />
+      )}
     </div>
   );
 }

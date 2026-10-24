@@ -42,3 +42,17 @@ export function checkQuote(
   if (hasImage) return "ai-extracted";
   return "unverified";
 }
+
+/** Map Arabic-Indic and Persian digits to ASCII so "٢٨" matches 28. */
+export function asciiDigits(input: string): string {
+  return input
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x660))
+    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x6f0));
+}
+
+/** True when the quote contains `n` as a whole number (so 2 does not match 28, 5 does not match 15.00). */
+export function quoteHasNumber(quote: string, n: number): boolean {
+  const q = asciiDigits(quote.normalize("NFKC"));
+  const variants = new Set([String(n), String(n).padStart(2, "0")]);
+  return [...variants].some((v) => new RegExp(`(?<!\\d)${v}(?!\\d)`).test(q));
+}

@@ -63,6 +63,40 @@ export interface PlanFact {
   evidence: EvidenceStatus;
 }
 
+export interface PlanRequirement {
+  /** A document */
+  text: string;
+  source: string;
+  evidence: EvidenceStatus;
+}
+
+/**
+ * event = something that starts at that time; deadline = last moment to do something (e.g. registration)
+ */
+export type PlanEventKind = typeof PlanEventKind[keyof typeof PlanEventKind];
+
+
+export const PlanEventKind = {
+  event: 'event',
+  deadline: 'deadline',
+} as const;
+
+export interface PlanEvent {
+  title: string;
+  /** event = something that starts at that time; deadline = last moment to do something (e.g. registration) */
+  kind: PlanEventKind;
+  /** YYYY-MM-DD, or MM-DD when the notice does not state a year */
+  date: string;
+  /** HH:MM 24h, or empty when the notice gives no time */
+  time: string;
+  /** HH:MM 24h, or empty */
+  endTime: string;
+  /** Place as written in the notice */
+  location: string;
+  source: string;
+  evidence: EvidenceStatus;
+}
+
 export interface PlanPhrase {
   native: string;
   meaning: string;
@@ -83,6 +117,10 @@ export interface ActionPlan {
   sourceLang: ActionPlanSourceLang;
   steps: PlanStep[];
   facts: PlanFact[];
+  events: PlanEvent[];
+  requirements: PlanRequirement[];
+  /** Important things a reader would expect that the notice does not say */
+  missing: string[];
   phrase: PlanPhrase;
   caution: string;
 }
@@ -97,6 +135,35 @@ export const InterpretResultMode = {
 export interface InterpretResult {
   plan: ActionPlan;
   mode: InterpretResultMode;
+}
+
+export type AskInputLang = typeof AskInputLang[keyof typeof AskInputLang];
+
+
+export const AskInputLang = {
+  en: 'en',
+  tr: 'tr',
+  ar: 'ar',
+} as const;
+
+export interface AskInput {
+  lang: AskInputLang;
+  /** @maxLength 300 */
+  question: string;
+  text?: string;
+  image?: string;
+}
+
+export interface AskQuote {
+  quote: string;
+  evidence: EvidenceStatus;
+}
+
+export interface AskResult {
+  /** false when the notice does not contain the answer */
+  found: boolean;
+  answer: string;
+  evidence: AskQuote[];
 }
 
 export type ErrorCode = typeof ErrorCode[keyof typeof ErrorCode];
