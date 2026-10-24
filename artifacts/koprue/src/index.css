@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&family=Spline+Sans+Mono:wght@400;600&family=Noto+Kufi+Arabic:wght@400;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: hsl(var(--primary));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: hsl(var(--secondary));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: hsl(var(--muted));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: hsl(var(--accent));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: hsl(var(--destructive));
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+  --font-display: 'Bricolage Grotesque', 'Noto Kufi Arabic', sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root, .dark {
+  --background: 42 38% 92%;
+  --foreground: 232 48% 11%;
+  --border: 232 20% 76%;
+  --card: 44 45% 97%;
+  --card-foreground: 232 48% 11%;
+  --card-border: 232 20% 80%;
+  --popover: 44 45% 97%;
+  --popover-foreground: 232 48% 11%;
+  --popover-border: 232 20% 80%;
+  --primary: 11 88% 52%;
+  --primary-foreground: 44 45% 97%;
+  --secondary: 232 48% 11%;
+  --secondary-foreground: 44 45% 96%;
+  --muted: 40 25% 86%;
+  --muted-foreground: 232 18% 36%;
+  --accent: 44 96% 58%;
+  --accent-foreground: 232 48% 11%;
+  --destructive: 0 70% 42%;
+  --destructive-foreground: 44 45% 97%;
+  --input: 232 20% 60%;
+  --ring: 11 88% 52%;
+  --app-font-sans: 'DM Sans', 'Noto Kufi Arabic', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Spline Sans Mono', monospace;
+  --radius: 0.75rem;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  body { @apply font-sans antialiased bg-background text-foreground; overflow-x: hidden; }
+  :focus-visible { outline: 3px solid hsl(var(--accent)); outline-offset: 3px; border-radius: 6px; }
+  .on-ink :focus-visible { outline-color: hsl(var(--accent)); }
+  [dir='rtl'] { font-family: 'Noto Kufi Arabic', 'DM Sans', sans-serif; }
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.mono { font-family: var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; font-size: .7rem; }
+
+/* bridge planks */
+@keyframes plank-in { from { opacity: 0; transform: translateY(-30px) translateZ(60px) rotateX(70deg); } to { opacity: 1; } }
+@keyframes plank-pulse { 0%, 100% { background-color: hsl(var(--accent)); } 50% { background-color: hsl(var(--primary)); } }
+@keyframes sway { 0%, 100% { transform: translateY(0) rotateZ(-.6deg); } 50% { transform: translateY(-8px) rotateZ(.6deg); } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes march { to { background-position: 28px 0; } }
+
+.plank {
+  height: 14px; width: 22px; border-radius: 3px; flex: none;
+  background: hsl(var(--accent));
+  box-shadow: 0 6px 0 hsl(var(--accent) / .35);
+  animation: plank-in .7s both cubic-bezier(.2, .8, .2, 1), plank-pulse 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 90ms), calc(var(--i) * 260ms + 1s);
+}
+@media (min-width: 768px) {
+  .plank { height: 18px; width: 30px; transform: translateY(calc(var(--arc) * -1px)); }
+}
+.sway { animation: sway 6s ease-in-out infinite; }
+.skeleton {
+  background: linear-gradient(90deg, hsl(var(--muted)) 20%, hsl(var(--card)) 50%, hsl(var(--muted)) 80%);
+  background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px;
+}
+.road {
+  height: 10px; background-image: repeating-linear-gradient(90deg, hsl(var(--accent)) 0 14px, transparent 14px 28px);
+  animation: march 1s linear infinite;
+}
+.tilt-card { transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s; transform-style: preserve-3d; }
+@media (hover: hover) {
+  .tilt-card:hover { transform: perspective(900px) rotateX(3deg) rotateY(-4deg) translateZ(8px); box-shadow: 12px 16px 0 hsl(var(--secondary) / .9); }
+  [dir='rtl'] .tilt-card:hover { transform: perspective(900px) rotateX(3deg) rotateY(4deg) translateZ(8px); box-shadow: -12px 16px 0 hsl(var(--secondary) / .9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  .tilt-card:hover { transform: none !important; }
+}

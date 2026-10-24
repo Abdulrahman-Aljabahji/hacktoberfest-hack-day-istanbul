@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: interpret
+    description: Notice interpretation
 paths:
   /healthz:
     get:
@@ -24,6 +26,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /interpret/status:
+    get:
+      operationId: getInterpretStatus
+      tags: [interpret]
+      summary: Whether live model analysis is configured
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterpretStatus"
+  /interpret:
+    post:
+      operationId: interpretNotice
+      tags: [interpret]
+      summary: Turn a photo or pasted text of a notice into an action plan using Gemma 4
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterpretInput"
+      responses:
+        "200":
+          description: Action plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterpretResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Live analysis not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +77,79 @@ components:
           type: string
       required:
         - status
-
+    InterpretStatus:
+      type: object
+      required: [connected, model]
+      properties:
+        connected:
+          type: boolean
+        model:
+          type: string
+    InterpretInput:
+      type: object
+      required: [lang]
+      properties:
+        lang:
+          type: string
+          enum: [en, tr, ar]
+          description: Target language of the result
+        text:
+          type: string
+          description: Pasted notice text
+        image:
+          type: string
+          description: Data URL (jpeg/png/webp base64) of a photographed notice
+    PlanStep:
+      type: object
+      required: [title, detail, source]
+      properties:
+        title: { type: string }
+        detail: { type: string }
+        source: { type: string, description: Verbatim original-language evidence quote, may be empty }
+    PlanFact:
+      type: object
+      required: [label, value, source]
+      properties:
+        label: { type: string }
+        value: { type: string }
+        source: { type: string }
+    PlanPhrase:
+      type: object
+      required: [native, meaning]
+      properties:
+        native: { type: string }
+        meaning: { type: string }
+    ActionPlan:
+      type: object
+      required: [headline, summary, sourceLang, steps, facts, phrase, caution]
+      properties:
+        headline: { type: string }
+        summary: { type: string }
+        sourceLang:
+          type: string
+          enum: [tr-TR, en-US, ar-SA]
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanStep"
+        facts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanFact"
+        phrase:
+          $ref: "#/components/schemas/PlanPhrase"
+        caution: { type: string }
+    InterpretResult:
+      type: object
+      required: [plan, mode]
+      properties:
+        plan:
+          $ref: "#/components/schemas/ActionPlan"
+        mode:
+          type: string
+          enum: [live]
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
