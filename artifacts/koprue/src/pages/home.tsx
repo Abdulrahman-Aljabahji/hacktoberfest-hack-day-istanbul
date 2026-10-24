@@ -11,7 +11,7 @@ import type { Lang } from '@/lib/sample';
 type Source = { kind: 'sample' } | { kind: 'image'; value: string } | { kind: 'text'; value: string };
 type Status = 'ready' | 'loading' | 'error';
 
-const MAX = 4 * 1024 * 1024;
+const MAX = 25 * 1024 * 1024;
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function Evidence({ quote, lang, id }: { quote: string; lang: Lang; id: string }) {
@@ -117,11 +117,25 @@ export default function Home() {
   const handleFile = (file?: File | null) => {
     if (!file) return;
     if (!OK_TYPES.includes(file.type)) return flash('Choose a JPG, PNG or WebP image.');
-    if (file.size > MAX) return flash('That image is too large. Please choose one under 4 MB.');
-    const r = new FileReader();
-    r.onload = () => { if (typeof r.result === 'string') void run({ kind: 'image', value: r.result }, lang); };
-    r.onerror = () => flash('Could not read the image.');
-    r.readAsDataURL(file);
+    if (file.size > MAX) return flash('That image is too large. Please choose one under 25 MB.');
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      // Downscale large phone photos so uploads are small and fast.
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = canvas.getContext('2d');
+      URL.revokeObjectURL(url);
+      if (!ctx) return flash('Could not read the image.');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      void run({ kind: 'image', value: canvas.toDataURL('image/jpeg', 0.85) }, lang);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); flash('Could not read the image. Try a JPG or PNG.'); };
+    img.src = url;
   };
 
   const onDrop = (e: DragEvent) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); };
@@ -246,7 +260,7 @@ export default function Home() {
               className={`border-2 border-dashed border-secondary p-5 transition-colors ${drag ? 'bg-accent' : 'bg-card'}`}
             >
               <p className="font-display font-bold text-xl">Drop a photo of the notice</p>
-              <p className="text-sm text-muted-foreground mt-1">JPG, PNG or WebP, up to 4 MB. Uploads go to the Gemini API. Do not upload IDs or private documents.</p>
+              <p className="text-sm text-muted-foreground mt-1">JPG, PNG or WebP, resized automatically. Uploads go to the Gemini API. Do not upload IDs or private documents.</p>
               <div className="flex flex-wrap gap-2 mt-4">
                 <button type="button" onClick={() => fileRef.current?.click()} data-testid="button-upload" className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground font-bold px-4 min-h-11 hover:bg-primary transition-colors"><Upload size={16} aria-hidden="true" /> Choose image</button>
                 <button type="button" onClick={() => camRef.current?.click()} data-testid="button-camera" className="inline-flex items-center gap-2 border-2 border-secondary font-bold px-4 min-h-11 hover:bg-accent transition-colors"><Camera size={16} aria-hidden="true" /> Take photo</button>
