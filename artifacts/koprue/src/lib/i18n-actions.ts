@@ -3,6 +3,13 @@ import type { Lang } from './sample';
 /** Strings for Ask the Notice, calendar export, checklist and the Action Passport. */
 export const A: Record<Lang, Record<string, string>> = {
   en: {
+    stUpD: 'Upcoming deadline', stTodayD: 'Deadline today', stPassedD: 'Deadline passed', stUpE: 'Upcoming event', stTodayE: 'Event today', stPassedE: 'Event date passed', stUncertain: 'Date uncertain', stNone: 'Date not provided',
+    stDaysLeft: '{n} day(s) left', stDaysAgo: 'passed {n} day(s) ago',
+    stPassedWarn: 'A date on this notice has already passed (today is {today}). This may be an old announcement. Check with the issuer before acting. KÖPRÜ cannot tell whether a new deadline exists, and does not assume one.',
+    stUncertainWarn: 'Some dates on this notice are uncertain (missing year or unclear day/month order). Confirm them with the issuer.',
+    stReasonNoYear: 'The notice gives no year.', stReasonAmbiguous: 'The day/month order is unclear (for example 04/11).',
+    calConfirmPassed: 'I understand this date has already passed and I still want to export it.', calConfirmUncertain: 'I understand this date is uncertain and I have checked it.', calNeedConfirm: 'Tick the confirmation box before downloading.',
+    ppWarnPassed: 'At least one date on the notice has passed. This may be an old announcement.', ppWarnUncertainDate: 'At least one date is uncertain (missing year or unclear order).',
     askTitle: 'Ask the notice', askHint: 'Gemma 4 answers only from this notice. If it is not written there, you will be told.',
     askPlaceholder: 'Ask about the notice...', askButton: 'Ask', askBusy: 'Gemma 4 is reading the notice for your answer...',
     askNotFound: 'Not provided in this notice', askFound: 'From the notice', askNeedsLive: 'Questions need live analysis, which is not configured here.',
@@ -28,6 +35,13 @@ export const A: Record<Lang, Record<string, string>> = {
     ppNone: 'None found in the notice', ppNoYear: 'year not stated', ppAllDay: 'no time stated', ppCreated: 'Created',
   },
   tr: {
+    stUpD: 'Yaklaşan son tarih', stTodayD: 'Son tarih bugün', stPassedD: 'Son tarih geçti', stUpE: 'Yaklaşan etkinlik', stTodayE: 'Etkinlik bugün', stPassedE: 'Etkinlik tarihi geçti', stUncertain: 'Tarih belirsiz', stNone: 'Tarih belirtilmemiş',
+    stDaysLeft: '{n} gün kaldı', stDaysAgo: '{n} gün önce geçti',
+    stPassedWarn: 'Duyurudaki bir tarih geçmiş (bugün {today}). Bu eski bir duyuru olabilir. İşlem yapmadan önce yayımlayan kurumla doğrulayın. KÖPRÜ yeni bir son tarih olup olmadığını bilemez ve varsaymaz.',
+    stUncertainWarn: 'Duyurudaki bazı tarihler belirsiz (yıl yok veya gün/ay sırası belirsiz). Yayımlayan kurumla doğrulayın.',
+    stReasonNoYear: 'Duyuruda yıl belirtilmemiş.', stReasonAmbiguous: 'Gün/ay sırası belirsiz (ör. 04/11).',
+    calConfirmPassed: 'Bu tarihin geçtiğini anlıyorum ve yine de dışa aktarmak istiyorum.', calConfirmUncertain: 'Bu tarihin belirsiz olduğunu anlıyorum ve kontrol ettim.', calNeedConfirm: 'İndirmeden önce onay kutusunu işaretleyin.',
+    ppWarnPassed: 'Duyurudaki en az bir tarih geçmiş. Bu eski bir duyuru olabilir.', ppWarnUncertainDate: 'En az bir tarih belirsiz (yıl yok veya sıra belirsiz).',
     askTitle: 'Duyuruya sor', askHint: 'Gemma 4 yalnızca bu duyurudan yanıt verir. Yazmıyorsa size söylenir.',
     askPlaceholder: 'Duyuru hakkında sorun...', askButton: 'Sor', askBusy: 'Gemma 4 yanıtınız için duyuruyu okuyor...',
     askNotFound: 'Bu duyuruda belirtilmemiş', askFound: 'Duyurudan', askNeedsLive: 'Sorular canlı analiz gerektirir; burada yapılandırılmamış.',
@@ -53,6 +67,13 @@ export const A: Record<Lang, Record<string, string>> = {
     ppNone: 'Duyuruda bulunamadı', ppNoYear: 'yıl belirtilmemiş', ppAllDay: 'saat belirtilmemiş', ppCreated: 'Oluşturuldu',
   },
   ar: {
+    stUpD: 'موعد نهائي قادم', stTodayD: 'الموعد النهائي اليوم', stPassedD: 'انتهى الموعد النهائي', stUpE: 'فعالية قادمة', stTodayE: 'الفعالية اليوم', stPassedE: 'مضى تاريخ الفعالية', stUncertain: 'التاريخ غير مؤكد', stNone: 'لم يُذكر تاريخ',
+    stDaysLeft: 'متبقٍ {n} يوم', stDaysAgo: 'مضى {n} يوم',
+    stPassedWarn: 'مضى تاريخ مذكور في هذا الإعلان (اليوم {today}). قد يكون إعلانًا قديمًا. تحقق من الجهة المصدرة قبل التصرف. لا يستطيع KÖPRÜ معرفة ما إذا كان هناك موعد جديد ولا يفترضه.',
+    stUncertainWarn: 'بعض التواريخ في هذا الإعلان غير مؤكدة (بلا سنة أو ترتيب اليوم/الشهر غير واضح). تأكد من الجهة المصدرة.',
+    stReasonNoYear: 'لا يذكر الإعلان السنة.', stReasonAmbiguous: 'ترتيب اليوم/الشهر غير واضح (مثل 04/11).',
+    calConfirmPassed: 'أفهم أن هذا التاريخ قد مضى وما زلت أريد التصدير.', calConfirmUncertain: 'أفهم أن هذا التاريخ غير مؤكد وقد تحققت منه.', calNeedConfirm: 'ضع علامة في خانة التأكيد قبل التنزيل.',
+    ppWarnPassed: 'مضى تاريخ واحد على الأقل في الإعلان. قد يكون إعلانًا قديمًا.', ppWarnUncertainDate: 'تاريخ واحد على الأقل غير مؤكد (بلا سنة أو ترتيب غير واضح).',
     askTitle: 'اسأل عن الإعلان', askHint: 'يجيب Gemma 4 من هذا الإعلان فقط. إن لم يكن مكتوبًا فيه سيُخبرك بذلك.',
     askPlaceholder: 'اسأل عن الإعلان...', askButton: 'اسأل', askBusy: 'يقرأ Gemma 4 الإعلان للإجابة عن سؤالك...',
     askNotFound: 'غير مذكور في هذا الإعلان', askFound: 'من الإعلان', askNeedsLive: 'الأسئلة تحتاج إلى التحليل المباشر وهو غير مُفعّل هنا.',

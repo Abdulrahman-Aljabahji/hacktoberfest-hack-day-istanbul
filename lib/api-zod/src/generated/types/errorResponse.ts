@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ErrorCode } from './errorCode';
+import type { ErrorResponseStage } from './errorResponseStage';
 
 export interface ErrorResponse {
   error: string;
   code: ErrorCode;
+  stage?: ErrorResponseStage;
 }

@@ -10,8 +10,10 @@ import type { InterpretInputLang } from './interpretInputLang';
 export interface InterpretInput {
   /** Target language of the result */
   lang: InterpretInputLang;
-  /** Pasted notice text */
+  /** Pasted notice text, or text read from a photo by on-device OCR when fromPhoto is true */
   text?: string;
   /** Data URL (jpeg/png/webp base64) of a photographed notice */
   image?: string;
+  /** True when text was extracted from a photo (OCR), so quotes are never marked verified */
+  fromPhoto?: boolean;
 }

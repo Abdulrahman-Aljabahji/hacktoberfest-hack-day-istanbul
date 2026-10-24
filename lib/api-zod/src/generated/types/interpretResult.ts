@@ -6,9 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ActionPlan } from './actionPlan';
+import type { InterpretResultDiagnostics } from './interpretResultDiagnostics';
 import type { InterpretResultMode } from './interpretResultMode';
 
 export interface InterpretResult {
+  /** Non-sensitive timing information for the request */
+  diagnostics?: InterpretResultDiagnostics;
   plan: ActionPlan;
   /** Text the AI read from a photo (empty for pasted text) */
   transcript: string;

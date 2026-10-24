@@ -1,5 +1,6 @@
 import type { ActionPlan, EvidenceStatus } from '@workspace/api-client-react';
-import { formatEventDate } from '@/components/calendar-export';
+import { checkDate, statusLabel, todayIn } from '@/lib/deadlines';
+import { NOTICE_ZONE, formatEventDate } from '@/components/calendar-export';
 import { A } from '@/lib/i18n-actions';
 import { T } from '@/lib/sample';
 import type { Lang } from '@/lib/sample';
@@ -7,7 +8,7 @@ import type { Lang } from '@/lib/sample';
 export type SourceKind = 'sample' | 'image' | 'text';
 
 /** Warnings that must always be printed when they apply. Exported for tests. */
-export function passportWarnings(plan: ActionPlan, kind: SourceKind, lang: Lang): string[] {
+export function passportWarnings(plan: ActionPlan, kind: SourceKind, lang: Lang, today: string = todayIn(NOTICE_ZONE)): string[] {
   const a = A[lang];
   const all = [...plan.steps, ...plan.facts, ...plan.events, ...plan.requirements];
   const has = (s: EvidenceStatus) => all.some((i) => i.evidence === s);
@@ -16,6 +17,9 @@ export function passportWarnings(plan: ActionPlan, kind: SourceKind, lang: Lang)
   if (has('unverified')) out.push(a.ppWarnUnverified!);
   if (has('none')) out.push(a.ppWarnNoQuote!);
   if (plan.events.some((e) => !/^\d{4}-/.test(e.date))) out.push(a.ppWarnYear!);
+  const checks = plan.events.map((e) => checkDate(e, today).status);
+  if (checks.includes('passed')) out.push(a.ppWarnPassed!);
+  if (checks.includes('uncertain')) out.push(a.ppWarnUncertainDate!);
   if (plan.caution) out.push(`${T[lang].caution}: ${plan.caution}`);
   return out;
 }
@@ -30,9 +34,9 @@ function Quote({ quote, evidence, lang }: { quote: string; evidence: EvidenceSta
 }
 
 /** A one-page printable plan. Hidden on screen; shown by the print stylesheet. */
-export function ActionPassport({ plan, lang, done, kind }: { plan: ActionPlan; lang: Lang; done: Set<number>; kind: SourceKind }) {
+export function ActionPassport({ plan, lang, done, kind, today }: { plan: ActionPlan; lang: Lang; done: Set<number>; kind: SourceKind; today: string }) {
   const a = A[lang];
-  const warnings = passportWarnings(plan, kind, lang);
+  const warnings = passportWarnings(plan, kind, lang, today);
   const source = kind === 'sample' ? a.ppSourceSample : kind === 'image' ? a.ppSourceImage : a.ppSourceText;
   const created = new Intl.DateTimeFormat(lang === 'ar' ? 'ar' : lang === 'tr' ? 'tr-TR' : 'en-GB', { dateStyle: 'long' }).format(new Date());
   return (
@@ -51,7 +55,7 @@ export function ActionPassport({ plan, lang, done, kind }: { plan: ActionPlan; l
         <ul>
           {plan.events.map((e, i) => (
             <li key={i}>
-              <strong>{e.kind === 'deadline' ? a.calKindDeadline : a.calKindEvent}: {e.title}</strong> — {formatEventDate(e.date, lang)}
+              <strong>{e.kind === 'deadline' ? a.calKindDeadline : a.calKindEvent}: {e.title}</strong> — {formatEventDate(e.date, lang)} [{statusLabel(a, e.kind, checkDate(e, today).status)}]
               {e.time ? ` · ${e.time}` : ` · ${a.ppAllDay}`}{!/^\d{4}-/.test(e.date) ? ` · ${a.ppNoYear}` : ''}
               {e.location ? <> · <span lang="tr" dir="auto">{e.location}</span></> : null}
               <Quote quote={e.source} evidence={e.evidence} lang={lang} />

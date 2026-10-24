@@ -53,7 +53,7 @@ export function describeFailure(err: unknown): Failure {
     case 'image_too_large':
       return { kind: 'too_large', retry: false, title: 'That image is too large', body: 'Choose a smaller picture or take a new photo. If it is a screenshot of a whole page, crop it to the notice. You can also paste the text.' };
     case 'timeout':
-      return { kind: 'timeout', retry: true, title: 'Gemma 4 took too long', body: 'The model did not answer in time, even after an automatic second attempt. Your image is still here, so just press Try again. A closer photo of only the notice is usually faster, or paste the text.' };
+      return { kind: 'timeout', retry: true, title: 'Gemma 4 took too long', body: 'The model did not answer in time, even after an automatic second attempt. Your image is still here, so just press Try again. You can also crop the photo to the notice, read its text on this device, or paste the text.' };
     case 'network':
     case 'upstream_unavailable':
       return { kind: 'network', retry: true, title: "Couldn't reach the AI service", body: 'Check your internet connection and try again in a moment. The sample below still works offline.' };

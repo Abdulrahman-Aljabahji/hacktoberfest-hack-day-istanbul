@@ -29,10 +29,12 @@ export const InterpretInputLang = {
 export interface InterpretInput {
   /** Target language of the result */
   lang: InterpretInputLang;
-  /** Pasted notice text */
+  /** Pasted notice text, or text read from a photo by on-device OCR when fromPhoto is true */
   text?: string;
   /** Data URL (jpeg/png/webp base64) of a photographed notice */
   image?: string;
+  /** True when text was extracted from a photo (OCR), so quotes are never marked verified */
+  fromPhoto?: boolean;
 }
 
 /**
@@ -125,6 +127,28 @@ export interface ActionPlan {
   caution: string;
 }
 
+export type InterpretResultDiagnosticsExtraction = typeof InterpretResultDiagnosticsExtraction[keyof typeof InterpretResultDiagnosticsExtraction];
+
+
+export const InterpretResultDiagnosticsExtraction = {
+  'gemma-vision': 'gemma-vision',
+  'ocr-text': 'ocr-text',
+  'pasted-text': 'pasted-text',
+} as const;
+
+/**
+ * Non-sensitive timing information for the request
+ */
+export type InterpretResultDiagnostics = {
+  extraction: InterpretResultDiagnosticsExtraction;
+  transcribeMs: number;
+  planMs: number;
+  totalMs: number;
+  transcribeAttempts: number;
+  planAttempts: number;
+  payloadKB: number;
+};
+
 export type InterpretResultMode = typeof InterpretResultMode[keyof typeof InterpretResultMode];
 
 
@@ -133,6 +157,8 @@ export const InterpretResultMode = {
 } as const;
 
 export interface InterpretResult {
+  /** Non-sensitive timing information for the request */
+  diagnostics?: InterpretResultDiagnostics;
   plan: ActionPlan;
   /** Text the AI read from a photo (empty for pasted text) */
   transcript: string;
@@ -187,8 +213,17 @@ export const ErrorCode = {
   server_error: 'server_error',
 } as const;
 
+export type ErrorResponseStage = typeof ErrorResponseStage[keyof typeof ErrorResponseStage];
+
+
+export const ErrorResponseStage = {
+  transcription: 'transcription',
+  analysis: 'analysis',
+} as const;
+
 export interface ErrorResponse {
   error: string;
   code: ErrorCode;
+  stage?: ErrorResponseStage;
 }
 

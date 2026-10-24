@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { HttpError, annotatePlan, interpret, parseAnswer, resilientCall, upstreamError } from "./interpret";
+import { HttpError, annotatePlan, interpret, makePrompt, parseAnswer, resilientCall, todayIstanbul, upstreamError } from "./interpret";
 
 const TEXT = "Kayıt için 27 Ekim saat 17.00'ye kadar formu doldurunuz. Salon B zemin kat.";
 
@@ -172,4 +172,44 @@ test("bad input is rejected before calling the model", async () => {
   assert.equal((await failureOf(interpret({ lang: "en", image: "data:image/gif;base64,AAAA" }))).code, "invalid_image");
   const huge = "A".repeat(Math.ceil((4 * 1024 * 1024 + 10) * 4 / 3));
   assert.equal((await failureOf(interpret({ lang: "en", image: `data:image/jpeg;base64,${huge}` }))).code, "image_too_large");
+});
+
+test("OCR text from a photo is never marked verified and is reported as ocr-text", async () => {
+  twoStage("unused");
+  const { plan, diagnostics } = await interpret({ lang: "en", text: PHOTO_TRANSCRIPT, fromPhoto: true });
+  assert.equal(diagnostics.extraction, "ocr-text");
+  assert.ok([...plan.steps, ...plan.facts].every((i) => i.evidence !== "verified"));
+  assert.deepEqual(plan.steps.map((s) => s.evidence), ["ai-extracted", "unverified", "none"]);
+});
+
+test("diagnostics report per-stage timing and attempts, and contain no document text", async () => {
+  twoStage(PHOTO_TRANSCRIPT);
+  const { diagnostics } = await interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" });
+  assert.equal(diagnostics.extraction, "gemma-vision");
+  assert.equal(diagnostics.transcribeAttempts, 1);
+  assert.equal(diagnostics.planAttempts, 1);
+  assert.ok(diagnostics.totalMs >= diagnostics.transcribeMs);
+  assert.ok(!JSON.stringify(diagnostics).includes("Ekim"));
+});
+
+test("a failure is attributed to the stage that failed", async () => {
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+    const body = String(init?.body);
+    return body.includes("Transcribe all text") ? new Response("{}", { status: 429 }) : modelReply(goodModelJson);
+  }) as typeof fetch;
+  const e1 = await failureOf(interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" }));
+  assert.deepEqual([e1.code, e1.stage], ["quota_exceeded", "transcription"]);
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) =>
+    String(init?.body).includes("Transcribe all text") ? modelReply(PHOTO_TRANSCRIPT) : new Response("{}", { status: 429 })) as typeof fetch;
+  const e2 = await failureOf(interpret({ lang: "en", image: "data:image/jpeg;base64,AAAA" }));
+  assert.deepEqual([e2.code, e2.stage], ["quota_exceeded", "analysis"]);
+});
+
+test("the prompt leaves date comparison to the app and forbids open/closed claims and treating academic years as deadlines", () => {
+  const p = makePrompt("en");
+  assert.match(p, /do NOT compare any date with today/);
+  assert.match(p, /Never say or imply[^.]*open, closed/);
+  assert.match(p, /academic year[^.]*not a deadline/);
+  assert.match(p, /Never invent extensions/);
+  assert.equal(todayIstanbul(new Date("2026-10-24T22:30:00Z")), "2026-10-25");
 });

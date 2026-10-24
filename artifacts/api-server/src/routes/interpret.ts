@@ -30,12 +30,12 @@ router.post("/interpret", async (req, res) => {
     return;
   }
   try {
-    const { plan, transcript } = await interpret(parsed.data);
-    res.json(InterpretNoticeResponse.parse({ plan, transcript, mode: "live" }));
+    const { plan, transcript, diagnostics } = await interpret(parsed.data);
+    res.json(InterpretNoticeResponse.parse({ plan, transcript, diagnostics, mode: "live" }));
   } catch (err) {
     if (err instanceof HttpError) {
-      req.log.warn({ status: err.status }, err.message);
-      res.status(err.status).json({ error: err.message, code: err.code });
+      req.log.warn({ status: err.status, stage: err.stage }, err.message);
+      res.status(err.status).json({ error: err.message, code: err.code, ...(err.stage ? { stage: err.stage } : {}) });
       return;
     }
     req.log.error({ err }, "interpret failed");

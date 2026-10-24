@@ -31,11 +31,21 @@ export const GetInterpretStatusResponse = zod.object({
  */
 export const InterpretNoticeBody = zod.object({
   "lang": zod.enum(['en', 'tr', 'ar']).describe('Target language of the result'),
-  "text": zod.string().optional().describe('Pasted notice text'),
-  "image": zod.string().optional().describe('Data URL (jpeg/png/webp base64) of a photographed notice')
+  "text": zod.string().optional().describe('Pasted notice text, or text read from a photo by on-device OCR when fromPhoto is true'),
+  "image": zod.string().optional().describe('Data URL (jpeg/png/webp base64) of a photographed notice'),
+  "fromPhoto": zod.boolean().optional().describe('True when text was extracted from a photo (OCR), so quotes are never marked verified')
 })
 
 export const InterpretNoticeResponse = zod.object({
+  "diagnostics": zod.object({
+  "extraction": zod.enum(['gemma-vision', 'ocr-text', 'pasted-text']),
+  "transcribeMs": zod.number().int(),
+  "planMs": zod.number().int(),
+  "totalMs": zod.number().int(),
+  "transcribeAttempts": zod.number().int(),
+  "planAttempts": zod.number().int(),
+  "payloadKB": zod.number().int()
+}).optional().describe('Non-sensitive timing information for the request'),
   "plan": zod.object({
   "headline": zod.string(),
   "summary": zod.string(),

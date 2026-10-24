@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Camera, Check, Copy, Printer, RotateCcw, Type, Upload, Volume2 } from 'lucide-react';
+import { Camera, Check, Copy, Crop, Printer, RotateCcw, ScanText, Type, Upload, Volume2 } from 'lucide-react';
 import { interpretNotice, useGetInterpretStatus } from '@workspace/api-client-react';
 import type { ActionPlan } from '@workspace/api-client-react';
 import { BridgeScene } from '@/components/bridge-scene';
 import { ActionPassport } from '@/components/action-passport';
 import { AskNotice } from '@/components/ask-notice';
-import { CalendarExport } from '@/components/calendar-export';
+import { CalendarExport, NOTICE_ZONE } from '@/components/calendar-export';
+import { checkDate, todayIn } from '@/lib/deadlines';
+import { CropDialog } from '@/components/crop-dialog';
+import { OcrReview } from '@/components/ocr-review';
+import { loadImage, renderJpeg } from '@/lib/image-prep';
+import type { Rect } from '@/lib/image-prep';
 import { ChecklistProgress, StepToggle } from '@/components/checklist';
 import { Evidence } from '@/components/evidence';
-import { A } from '@/lib/i18n-actions';
+import { A, fill } from '@/lib/i18n-actions';
 import { SAMPLE, SAMPLE_NOTICE, T } from '@/lib/sample';
 import type { Lang } from '@/lib/sample';
 import { describeFailure, describeFileProblem } from '@/lib/errors';
@@ -62,6 +67,13 @@ export default function Home() {
   const [docId, setDocId] = useState(0);
   const [done, setDone] = useState<Set<number>>(new Set());
   const lastSrc = useRef<string>('sample');
+  // The original full-resolution photo stays in memory (only) so it can be cropped without losing quality.
+  const [origFile, setOrigFile] = useState<Blob | null>(null);
+  const [cropUrl, setCropUrl] = useState<string | null>(null);
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const [transcriptOrigin, setTranscriptOrigin] = useState<'ai' | 'ocr'>('ai');
+  // Text the reader reviewed after on-device OCR. Retries and language changes reuse it instead of the image.
+  const ocrRef = useRef<string | undefined>(undefined);
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
@@ -82,7 +94,9 @@ export default function Home() {
 
   useEffect(() => () => { ctrl.current?.abort(); window.speechSynthesis?.cancel(); }, []);
 
-  const run = useCallback(async (s: Exclude<Source, { kind: 'sample' }>, l: Lang, scroll = true) => {
+  const run = useCallback(async (s: Exclude<Source, { kind: 'sample' }>, l: Lang, scroll = true, override?: string) => {
+    ocrRef.current = override;
+    setOcrOpen(false);
     ctrl.current?.abort();
     const c = new AbortController();
     ctrl.current = c;
@@ -98,12 +112,13 @@ export default function Home() {
     if (scroll) resultRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     try {
       const res = await interpretNotice(
-        { lang: l, ...(s.kind === 'image' ? { image: s.value } : { text: s.value }) },
+        { lang: l, ...(override ? { text: override, fromPhoto: true } : s.kind === 'image' ? { image: s.value } : { text: s.value }) },
         { signal: c.signal },
       );
       if (id !== reqId.current) return;
       setLive(res.plan);
-      setTranscript(res.transcript ?? '');
+      setTranscript(override ?? res.transcript ?? '');
+      setTranscriptOrigin(override ? 'ocr' : 'ai');
       setState('ready');
     } catch (err) {
       if (id !== reqId.current || c.signal.aborted) return;
@@ -114,7 +129,7 @@ export default function Home() {
 
   const changeLang = (l: Lang) => {
     setLang(l);
-    if (src.kind !== 'sample') void run(src, l, false);
+    if (src.kind !== 'sample') void run(src, l, false, ocrRef.current);
   };
 
   const resetSample = () => {
@@ -124,6 +139,9 @@ export default function Home() {
     setDocId((n) => n + 1);
     setDone(new Set());
     setSrc({ kind: 'sample' });
+    setOrigFile(null);
+    ocrRef.current = undefined;
+    setOcrOpen(false);
     setLive(null);
     setTranscript('');
     setFailure(null);
@@ -139,24 +157,30 @@ export default function Home() {
     if (!file) return;
     const problem = describeFileProblem(file, MAX);
     if (problem) return flash(problem);
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      // Downscale large phone photos so uploads are small and fast.
-      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      const ctx = canvas.getContext('2d');
-      URL.revokeObjectURL(url);
-      if (!ctx) return flash("This browser couldn't prepare the image. Try another photo or paste the text.");
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      void run({ kind: 'image', value: canvas.toDataURL('image/jpeg', 0.85) }, lang);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); flash("That image couldn't be opened. It may be damaged or in an unsupported format. Try a JPG or PNG, or paste the text."); };
-    img.src = url;
+    loadImage(file).then(
+      (img) => {
+        try {
+          setOrigFile(file);
+          void run({ kind: 'image', value: renderJpeg(img) }, lang);
+        } catch {
+          flash("This browser couldn't prepare the image. Try another photo or paste the text.");
+        }
+      },
+      () => flash("That image couldn't be opened. It may be damaged or in an unsupported format. Try a JPG or PNG, or paste the text."),
+    );
+  };
+
+  const openCrop = () => { if (origFile) setCropUrl(URL.createObjectURL(origFile)); };
+  const closeCrop = useCallback(() => setCropUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }), []);
+  const applyCrop = async (rect: Rect) => {
+    if (!origFile) return;
+    closeCrop();
+    try {
+      const img = await loadImage(origFile);
+      void run({ kind: 'image', value: renderJpeg(img, rect) }, lang);
+    } catch {
+      flash("This browser couldn't crop the image. Try another photo or paste the text.");
+    }
   };
 
   const onDrop = (e: DragEvent) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); };
@@ -164,6 +188,7 @@ export default function Home() {
   const submitText = () => {
     const v = text.trim();
     if (!v) return flash('Paste a short notice first.');
+    setOrigFile(null);
     void run({ kind: 'text', value: v }, lang);
   };
 
@@ -172,6 +197,9 @@ export default function Home() {
   const t = T[lang];
   const rtl = lang === 'ar';
   const a = A[lang];
+  // Reference date for deadline status, in the notice's timezone. Recomputed each render so it never goes stale.
+  const today = todayIn(NOTICE_ZONE);
+  const dateStatuses = (plan?.events ?? []).map((e) => checkDate(e, today).status);
   const toggleDone = (i: number) => setDone((d) => { const n = new Set(d); if (n.has(i)) n.delete(i); else n.add(i); return n; });
   const askSource = src.kind === 'image' ? (transcript ? { text: transcript, fromPhoto: true } : { image: src.value }) : { text: src.kind === 'text' ? src.value : [SAMPLE_NOTICE.title, ...SAMPLE_NOTICE.lines].join('\n') };
 
@@ -311,12 +339,15 @@ export default function Home() {
                 </div>
               )}
               {src.kind === 'image' && <img src={src.value} alt="Your uploaded notice" className="mt-3 max-h-80 w-full object-contain" />}
+              {src.kind === 'image' && origFile && state !== 'loading' && (
+                <button type="button" onClick={openCrop} data-testid="button-crop" className="mono mt-3 inline-flex items-center gap-1.5 border-2 border-secondary px-3 min-h-11 hover:bg-accent" dir="ltr" lang="en"><Crop size={14} aria-hidden="true" /> Crop photo</button>
+              )}
               {src.kind === 'text' && <p dir="auto" className="mt-3 text-sm whitespace-pre-wrap break-words max-h-80 overflow-auto">{src.value}</p>}
               {src.kind === 'image' && transcript && state === 'ready' && (
                 <details className="mt-3 text-sm" data-testid="details-transcript">
-                  <summary className="mono cursor-pointer">Text Gemma 4 read from your photo</summary>
+                  <summary className="mono cursor-pointer">{transcriptOrigin === 'ocr' ? 'Text read on your device by OCR (reviewed by you)' : 'Text Gemma 4 read from your photo'}</summary>
                   <p dir="auto" className="mt-2 whitespace-pre-wrap break-words max-h-48 overflow-auto" data-testid="text-transcript">{transcript}</p>
-                  <p className="mt-2 text-xs text-secondary/70">AI transcription. It can contain reading mistakes, so compare it with your image.</p>
+                  <p className="mt-2 text-xs text-secondary/70">{transcriptOrigin === 'ocr' ? 'Machine-read text that you reviewed. Quotes from it are never shown as verified.' : 'AI transcription. It can contain reading mistakes, so compare it with your image.'}</p>
                 </details>
               )}
               <p className="text-xs mt-4 text-secondary/70">
@@ -338,26 +369,32 @@ export default function Home() {
 
             {state === 'loading' && <Loading />}
 
-            {state === 'error' && !isSample && failure && (
+            {ocrOpen && src.kind === 'image' && (
+              <OcrReview image={src.value} onClose={() => setOcrOpen(false)} onPaste={() => { setOcrOpen(false); pasteInstead(); }} onAnalyze={(t2) => void run(src, lang, true, t2)} />
+            )}
+
+            {state === 'error' && !isSample && failure && !ocrOpen && (
               <div role="alert" data-testid="state-error" data-failure={failure.kind} className="border-2 border-secondary bg-card p-6 shadow-[8px_8px_0_hsl(var(--primary))]" dir="ltr" lang="en">
                 <h3 className="font-display font-extrabold text-2xl" data-testid="text-error-title">{failure.title}</h3>
                 <p className="mt-2 text-muted-foreground" data-testid="text-error-body">{failure.body}</p>
                 <div className="flex flex-wrap gap-2 mt-4">
-                  {failure.retry && <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false)} data-testid="button-retry" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Try again</button>}
+                  {failure.retry && <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false, ocrRef.current)} data-testid="button-retry" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Try again</button>}
+                  {src.kind === 'image' && !ocrRef.current && <button type="button" onClick={() => setOcrOpen(true)} data-testid="button-ocr" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent inline-flex items-center gap-2"><ScanText size={16} aria-hidden="true" /> Read text on this device</button>}
                   {src.kind === 'image' && <button type="button" onClick={pasteInstead} data-testid="button-paste-instead" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent">Paste the text instead</button>}
                   <button type="button" onClick={resetSample} data-testid="button-error-reset" className="border-2 border-secondary font-bold px-5 min-h-11">Back to sample</button>
                 </div>
               </div>
             )}
 
-            {state === 'ready' && !isSample && plan && plan.steps.length === 0 && plan.facts.length === 0 && (
+            {state === 'ready' && !isSample && !ocrOpen && plan && plan.steps.length === 0 && plan.facts.length === 0 && (
               <div role="alert" data-testid="state-no-actions" className="border-2 border-secondary bg-card p-6 shadow-[8px_8px_0_hsl(var(--accent))]" dir="ltr" lang="en">
                 <h3 className="font-display font-extrabold text-2xl">No reliable actions found</h3>
                 <p className="mt-2 text-muted-foreground">KÖPRÜ could not find dates, places or tasks that it could back up from this {src.kind === 'image' ? 'image' : 'text'}. Nothing was guessed. Try a sharper, closer photo with the whole notice in frame, or paste the text.</p>
                 {plan.caution && <p className="mt-3 text-sm font-medium" data-testid="text-no-actions-caution"><strong className="mono me-2">Model note</strong>{plan.caution}</p>}
                 <div className="flex flex-wrap gap-2 mt-4">
                   <button type="button" onClick={pasteInstead} data-testid="button-paste-instead" className="bg-primary text-primary-foreground font-bold px-5 min-h-11">Paste the text instead</button>
-                  <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false)} data-testid="button-retry" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent">Try again</button>
+                  {src.kind === 'image' && !ocrRef.current && <button type="button" onClick={() => setOcrOpen(true)} data-testid="button-ocr" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent inline-flex items-center gap-2"><ScanText size={16} aria-hidden="true" /> Read text on this device</button>}
+                  <button type="button" onClick={() => void run(src as Exclude<Source, { kind: 'sample' }>, lang, false, ocrRef.current)} data-testid="button-retry" className="border-2 border-secondary font-bold px-5 min-h-11 hover:bg-accent">Try again</button>
                   <button type="button" onClick={resetSample} data-testid="button-error-reset" className="border-2 border-secondary font-bold px-5 min-h-11">Back to sample</button>
                 </div>
               </div>
@@ -372,6 +409,13 @@ export default function Home() {
 
                 {plan.caution && (
                   <div className="border-2 border-secondary bg-accent/60 p-4 text-sm font-medium" data-testid="text-caution"><strong className="mono me-2">{t.caution}</strong>{plan.caution}</div>
+                )}
+
+                {dateStatuses.includes('passed') && (
+                  <div role="alert" className="border-2 border-primary bg-card p-4 text-sm font-bold" data-testid="banner-passed">{fill(a.stPassedWarn!, { today })}</div>
+                )}
+                {dateStatuses.includes('uncertain') && (
+                  <div role="status" className="border-2 border-dashed border-secondary bg-card p-4 text-sm font-medium" data-testid="banner-uncertain">{a.stUncertainWarn}</div>
                 )}
 
                 {plan.facts.length > 0 && (
@@ -421,7 +465,7 @@ export default function Home() {
                   </section>
                 )}
 
-                <CalendarExport key={`cal-${docId}-${lang}`} events={plan.events} lang={lang} />
+                <CalendarExport key={`cal-${docId}-${lang}`} events={plan.events} lang={lang} today={today} />
 
                 {plan.missing.length > 0 && (
                   <section aria-label={a.ppMissing} className="border-2 border-primary p-4" data-testid="section-missing">
@@ -493,8 +537,10 @@ export default function Home() {
         </div>
       </footer>
 
+      {cropUrl && <CropDialog src={cropUrl} onApply={(r) => void applyCrop(r)} onCancel={closeCrop} />}
+
       {plan && state === 'ready' && (isSample || plan.steps.length > 0 || plan.facts.length > 0) && (
-        <ActionPassport plan={plan} lang={lang} done={done} kind={src.kind} />
+        <ActionPassport plan={plan} lang={lang} done={done} kind={src.kind} today={today} />
       )}
     </div>
   );

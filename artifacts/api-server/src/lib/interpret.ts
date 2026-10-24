@@ -180,6 +180,13 @@ export function parseAnswer(raw: unknown): ParsedPlan {
   };
 }
 
+/** Today's date (YYYY-MM-DD) in Istanbul, the timezone the notices are written for. */
+export function todayIstanbul(now: Date = new Date()): string {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const g = (t: string) => p.find((x) => x.type === t)!.value;
+  return `${g("year")}-${g("month")}-${g("day")}`;
+}
+
 export function makePrompt(lang: string): string {
   return `You are KÖPRÜ, a multilingual accessibility assistant. Help a person understand a real-world notice, poster, form, or sign and decide what to do next. The target language is ${LANG_NAMES[lang] ?? "English"}.
 
@@ -199,7 +206,9 @@ Return ONLY one JSON object, without markdown or commentary. Use this exact shap
  "caution": "any important uncertainty or limitation, in target language; empty if none"
 }
 
-Rules: maximum 4 clear steps, 3 facts, 4 events, 4 requirements and 3 missing items. A registration deadline is kind deadline and must never be reported as the event start; use separate events. Leave events empty when no real date is stated. Every claim must be directly supported by input. No fake source quotations. If image/text is unreadable, return empty steps with a helpful caution. Make UI-friendly short text. Ensure the JSON is valid with escaped quotation marks.`;
+Rules: maximum 4 clear steps, 3 facts, 4 events, 4 requirements and 3 missing items. A registration deadline is kind deadline and must never be reported as the event start; use separate events. Leave events empty when no real date is stated. Every claim must be directly supported by input. No fake source quotations. If image/text is unreadable, return empty steps with a helpful caution. Make UI-friendly short text. Ensure the JSON is valid with escaped quotation marks.
+
+Dates: do NOT compare any date with today's date and never say or imply that a date has passed, is upcoming, is near or is far away; the application checks that itself. Never say or imply in the headline, summary, steps or caution that applications, registration or an event are open, closed, ongoing or available; describe what the notice announces instead (for example "Notice: ..."). Never invent extensions, replacement dates or years. An academic year such as 2027-2028 is not a deadline or an event date; only an explicitly stated application, registration or event date may go into "events".`;
 }
 
 export type ErrorCode =
@@ -220,6 +229,8 @@ export class HttpError extends Error {
     public status: number,
     message: string,
     public code: ErrorCode,
+    /** Which pipeline stage failed, for diagnostics. Never contains document content. */
+    public stage?: "transcription" | "analysis",
   ) {
     super(message);
   }
@@ -324,7 +335,7 @@ export function resilientCall(
   parts: Record<string, unknown>[],
   hasImage: boolean,
   maxOutputTokens: number,
-  opts: { attemptMs?: number; hedgeMs?: number; totalMs?: number; maxAttempts?: number } = {},
+  opts: { attemptMs?: number; hedgeMs?: number; totalMs?: number; maxAttempts?: number; stats?: { attempts: number } } = {},
 ): Promise<string> {
   const { attemptMs = 30000, hedgeMs = 14000, totalMs = 36000, maxAttempts = 2 } = opts;
   return new Promise((resolve, reject) => {
@@ -344,6 +355,7 @@ export function resilientCall(
     const launch = () => {
       if (settled || launched >= maxAttempts) return;
       launched++;
+      if (opts.stats) opts.stats.attempts = launched;
       callModel(parts, hasImage, maxOutputTokens, AbortSignal.any([ctl.signal, AbortSignal.timeout(attemptMs)])).then(
         (text) => finish(() => resolve(text)),
         (e) => {
@@ -387,36 +399,64 @@ const OCR_PROMPT =
 const MIN_TRANSCRIPT = 12;
 
 /** Stage 1 for photos: a small, fast transcription call. */
-export async function transcribeImage(image: { mime: string; data: string }): Promise<string> {
+export async function transcribeImage(image: { mime: string; data: string }, stats?: { attempts: number }): Promise<string> {
   const out = await resilientCall(
     [{ text: OCR_PROMPT }, { inline_data: { mime_type: image.mime, data: image.data } }],
     true,
     1500,
-    { totalMs: 34000 },
+    { totalMs: 34000, stats },
   );
   return out.replace(/^\s*```\w*\s*/, "").replace(/\s*```\s*$/, "").trim().slice(0, 6000);
+}
+
+export interface Diagnostics {
+  extraction: "gemma-vision" | "ocr-text" | "pasted-text";
+  transcribeMs: number;
+  planMs: number;
+  totalMs: number;
+  transcribeAttempts: number;
+  planAttempts: number;
+  payloadKB: number;
 }
 
 export interface InterpretOutput {
   plan: ActionPlan;
   /** What the AI read from a photo (empty for pasted text). Shown so the reader can check it. */
   transcript: string;
+  diagnostics: Diagnostics;
+}
+
+function tag(stage: "transcription" | "analysis", e: unknown): never {
+  if (e instanceof HttpError && !e.stage) e.stage = stage;
+  throw e;
 }
 
 export async function interpret(input: {
   lang: string;
   text?: string | null;
   image?: string | null;
+  /** True when `text` was read from a photo by on-device OCR, so it must not count as the reader's own text. */
+  fromPhoto?: boolean;
 }): Promise<InterpretOutput> {
   if (!isConfigured()) {
     throw new HttpError(503, "Live analysis is not configured. The interactive sample works without it.", "not_configured");
   }
+  const t0 = Date.now();
   const { sourceText, image } = readSource(input);
+  const ta = { attempts: 0 };
+  const tp = { attempts: 0 };
   let transcript = "";
+  let transcribeMs = 0;
   if (image) {
-    transcript = await transcribeImage(image);
+    try {
+      transcript = await transcribeImage(image, ta);
+    } catch (e) {
+      logger.warn({ stage: "transcription", ms: Date.now() - t0, attempts: ta.attempts, code: (e as HttpError).code, payloadKB: Math.round(image.data.length * 0.75 / 1024) }, "stage failed");
+      tag("transcription", e);
+    }
+    transcribeMs = Date.now() - t0;
     if (transcript.length < MIN_TRANSCRIPT && !sourceText) {
-      throw new HttpError(422, "No readable text was found in this image.", "no_text_found");
+      throw new HttpError(422, "No readable text was found in this image.", "no_text_found", "transcription");
     }
   }
   // Stage 2 always works on text, which keeps the heavy structured answer fast and predictable.
@@ -424,13 +464,32 @@ export async function interpret(input: {
   const parts: Record<string, unknown>[] = [
     { text: `${makePrompt(input.lang)}\n\nUser-supplied text:\n${material}` },
   ];
-  const output = await resilientCall(parts, false, 2600, { totalMs: 38000 });
+  const t1 = Date.now();
+  let output: string;
+  try {
+    output = await resilientCall(parts, false, 2600, { totalMs: 38000, stats: tp });
+  } catch (e) {
+    logger.warn({ stage: "analysis", ms: Date.now() - t1, attempts: tp.attempts, code: (e as HttpError).code }, "stage failed");
+    tag("analysis", e);
+  }
+  const planMs = Date.now() - t1;
   let parsed: ParsedPlan;
   try {
     parsed = parseAnswer(output);
   } catch {
-    throw new HttpError(502, "The model response could not be understood.", "bad_model_response");
+    throw new HttpError(502, "The model response could not be understood.", "bad_model_response", "analysis");
   }
-  const plan = annotatePlan(parsed, { sourceText: material, hasImage: Boolean(image) });
-  return { plan, transcript };
+  const fromPhoto = Boolean(image) || Boolean(input.fromPhoto);
+  const plan = annotatePlan(parsed, { sourceText: material, hasImage: fromPhoto });
+  const diagnostics: Diagnostics = {
+    extraction: image ? "gemma-vision" : input.fromPhoto ? "ocr-text" : "pasted-text",
+    transcribeMs,
+    planMs,
+    totalMs: Date.now() - t0,
+    transcribeAttempts: ta.attempts,
+    planAttempts: tp.attempts,
+    payloadKB: image ? Math.round((image.data.length * 0.75) / 1024) : 0,
+  };
+  logger.info({ ...diagnostics, stage: "done" }, "interpret finished");
+  return { plan, transcript, diagnostics };
 }

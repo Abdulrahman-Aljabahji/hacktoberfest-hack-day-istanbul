@@ -173,10 +173,13 @@ components:
           description: Target language of the result
         text:
           type: string
-          description: Pasted notice text
+          description: Pasted notice text, or text read from a photo by on-device OCR when fromPhoto is true
         image:
           type: string
           description: Data URL (jpeg/png/webp base64) of a photographed notice
+        fromPhoto:
+          type: boolean
+          description: True when text was extracted from a photo (OCR), so quotes are never marked verified
     EvidenceStatus:
       type: string
       enum: [verified, unverified, none, ai-extracted]
@@ -269,6 +272,18 @@ components:
       type: object
       required: [plan, transcript, mode]
       properties:
+        diagnostics:
+          type: object
+          description: Non-sensitive timing information for the request
+          required: [extraction, transcribeMs, planMs, totalMs, transcribeAttempts, planAttempts, payloadKB]
+          properties:
+            extraction: { type: string, enum: [gemma-vision, ocr-text, pasted-text] }
+            transcribeMs: { type: integer }
+            planMs: { type: integer }
+            totalMs: { type: integer }
+            transcribeAttempts: { type: integer }
+            planAttempts: { type: integer }
+            payloadKB: { type: integer }
         plan:
           $ref: "#/components/schemas/ActionPlan"
         transcript:
@@ -328,3 +343,6 @@ components:
         error: { type: string }
         code:
           $ref: "#/components/schemas/ErrorCode"
+        stage:
+          type: string
+          enum: [transcription, analysis]
